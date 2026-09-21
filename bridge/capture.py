@@ -48,12 +48,14 @@ def format_summary(d):
 
 
 def capture(console_ip, *, packet_type="A", send_port=HEARTBEAT_PORT, recv_port=TELEMETRY_PORT,
-            seconds=None, out=None, say=print):
+            seconds=None, out=None, say=print, on_decoded=None, show_values=True, stop=None):
     """Send heartbeats to the console, receive and decode its packets, and return a Stats summary.
 
-    Runs until `seconds` have passed (or forever if None) or the user presses Ctrl-C. `out`, if
-    given, is a path to record the raw packets to. `say` receives each line of output, so tests can
-    silence or capture it.
+    Runs until `seconds` have passed (or forever if None), `stop` (a threading.Event) is set, or the
+    user presses Ctrl-C. `out`, if given, is a path to record the raw packets to. `say` receives each
+    line of output, so tests can silence or capture it. `on_decoded(decoded, seconds_since_start)` is
+    called for every packet that decodes, which is how the bridge gets its data; `show_values=False`
+    stops the live value lines for callers that don't want them.
     """
     # 1. Listen for telemetry. The heartbeat goes out from this same socket, so the console
     #    replies to the port we're listening on.
@@ -72,7 +74,7 @@ def capture(console_ip, *, packet_type="A", send_port=HEARTBEAT_PORT, recv_port=
     warned_no_data = False
 
     try:
-        while seconds is None or time.monotonic() - started < seconds:
+        while (seconds is None or time.monotonic() - started < seconds) and not (stop and stop.is_set()):
             now = time.monotonic()
 
             # 2. Keep the console sending: it stops if the heartbeat lapses
@@ -106,13 +108,16 @@ def capture(console_ip, *, packet_type="A", send_port=HEARTBEAT_PORT, recv_port=
             decoded = decode_a(plain)
             stats.last_summary = decoded
 
+            if on_decoded:
+                on_decoded(decoded, time.monotonic() - started)
+
             packet_id = decoded["packet_id"]
             if last_id is not None and packet_id > last_id + 1:
                 stats.lost += packet_id - last_id - 1
             last_id = packet_id
 
             # 5. Show a line a couple of times a second, not one per packet
-            if now - last_summary >= SUMMARY_EVERY_S:
+            if show_values and now - last_summary >= SUMMARY_EVERY_S:
                 say(format_summary(decoded))
                 last_summary = now
     except KeyboardInterrupt:
