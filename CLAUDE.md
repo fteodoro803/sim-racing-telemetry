@@ -5,6 +5,7 @@ Working conventions for keeping this repo's documentation current. Read alongsid
 - [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) — what the project is, its origin, what's settled-but-unbuilt, and what's deferred.
 - [`BUGS.md`](BUGS.md) — confirmed/suspected bugs, organised by domain. **If you find a bug that isn't the task you're doing, log it there before moving on** — don't just mention it in conversation. Before fixing an entry, re-verify it still reproduces; once fixed, add a regression test and move it to the Resolved log.
 - [`FEATURE_MAP.md`](FEATURE_MAP.md) — what features exist and how far along they are. Update it whenever a feature ships, changes surface, or moves between `Planned`/`Designed`/`Implemented`.
+- [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) — what GT7's telemetry packet provides, its units and quirks, and what this project does with each field. Update it when something about the packet is verified or turns out to be wrong, and when a field starts being used.
 - `TRACK_MAP_PLAN.md` — will hold the design for the track map, split editor and track identification, plus an Implementation Log of what's actually been built. Create it when that pass starts.
 
 There is deliberately no design-system doc or architecture-map doc (see D10 in `DECISIONS.md`); the README covers layout and the frame format.
@@ -32,6 +33,8 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 **Frame format is the contract.** Every source (demo, and each game's bridge decoder) produces the normalised frame described in the README, and `web/timing.js` only ever sees that. Game-specific knowledge belongs in a decoder, never in the timing or UI code.
 
 **Timing logic stays DOM-free and tested.** `web/timing.js`, `web/demo-source.js` and `web/format.js` must run under Node so `tests/` can cover them. Units: times in milliseconds, progress in metres, speed in km/h, pedals 0–100.
+
+**Bridge:** Python, one decoder module per game (D15). Keep the first slice standard-library only; anything added goes in `bridge/requirements.txt`. Decoders are pure functions from bytes to frames, so they can be tested from recorded packets without a console.
 
 **Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
 

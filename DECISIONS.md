@@ -27,6 +27,12 @@ When an open item is decided: move it to the Decided log with a one-line rationa
 | D8 | **Laps driven through the pit lane are not handled.** Not worth the complexity; a slow pit lap simply counts as a slow lap. No work created. | This file only |
 | D9 | **The `outline-style-comments` convention applies to all code in the repo, including code written before the convention was adopted.** | [`CLAUDE.md`](CLAUDE.md) Conventions |
 | D10 | **Docs in use: `DECISIONS`, `BUGS`, `PROJECT_CONTEXT`, `FEATURE_MAP`.** A design-system doc and an architecture-map doc are skipped (the tool is small; the README covers layout). A `TRACK_MAP_PLAN.md` will be added when the track-map pass starts. | [`CLAUDE.md`](CLAUDE.md) "Project docs" |
+| D11 | **The dashboard is snap-to-grid: widgets snap into place, with a few basic presets plus a "Custom" layout the user builds.** Not everyone wants the same things on screen. Free-form pixel placement was rejected because layouts break on other screen sizes. (was O12) | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 11; [`FEATURE_MAP.md`](FEATURE_MAP.md) |
+| D12 | **Tyres are shown as graphics that change colour with temperature, with no numeric labels.** The colour ranges need real data and are deferred to their own dedicated pass. | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Future directions; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
+| D13 | **The first proper version covers all the Driving and Timing details, fed by real GT7 data so it can be tested on the author's own console.** Tyres, fuel and analysis features come later. | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issues 1–6, 12–13; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
+| D14 | **What GT7 provides is kept in `GT7_TELEMETRY.md`, and new features are chosen from it.** | [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); [`CLAUDE.md`](CLAUDE.md) |
+| D13 (follow-up) | **The customisable layout (D11) comes after the first testable version.** The first version keeps the fixed layout, with the Driving and Timing widgets added to it. | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) "Origin and current scope" |
+| D15 | **The bridge is written in Python.** It's already in the author's toolchain. The first slice (heartbeat, receive, decrypt, record) uses only the standard library; anything added later, such as a WebSocket library, goes in `bridge/requirements.txt`, which is fine because `bridge/` isn't published. (was O1) | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 1; [`CLAUDE.md`](CLAUDE.md) Conventions; [`bridge/README.md`](bridge/README.md) |
 
 ---
 
@@ -59,10 +65,7 @@ D7 settled the principle. These details were Claude's: frames flagged `paused`, 
 
 ## Open — bridge
 
-**O1. Should the bridge be Python or Node?**
-The planning chat leaned Python (already used in the portfolio's build script; simple UDP and WebSocket; Salsa20 decode), with Node as the alternative. `bridge/README.md` says "Planned: Python" as though it were settled, but it isn't. It blocks [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 1.
-*Options:* Python (standard-library UDP, a small WebSocket library, `pycryptodome` or a short pure-Python Salsa20); Node (built-in UDP, the `ws` package, a Salsa20 package).
-*Recommendation:* Python: it's already in your toolchain, and either option needs one third-party WebSocket dependency and something installed on the user's machine. Revisit if packaging a one-file download for visitors matters more than familiarity.
+~~**O1. Should the bridge be Python or Node?**~~ **Decided as D15**: Python.
 
 **O2. Should a "loading" state reset the session?**
 Loading frames are currently dropped and the interrupted lap is invalidated, but completed laps and the reference line are kept. A load might mean a new track or car (so old laps are meaningless), or it might be a brief blip mid-session (so a reset would wipe good data). We don't yet know what the game does.
@@ -92,6 +95,17 @@ GT7 doesn't broadcast a track or circuit name, so any identification has to come
 The only signal today is the lap counter or clock going backwards, which resets the session. Switching to another track without that would compare laps against the wrong reference line.
 *Options:* detect a mismatch (the car far from the reference line for several seconds) and reset; ask the user; do nothing.
 *Recommendation:* mismatch detection with a reset, once we know how the coordinates behave (O3).
+
+---
+
+## Open — dashboard
+
+~~**O12. How should users lay out the dashboard?**~~ **Decided as D11**: snap-to-grid, with basic presets and a "Custom" layout. The remaining question, whether to use a library, is O13.
+
+**O13. Should the snap-to-grid layout use a library, or be hand-rolled?**
+Drag and resize on a grid is real work, and a phone needs a single-column fallback ([`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 11). It touches the no-dependency stance ([O9](DECISIONS.md)).
+*Options:* hand-roll the pointer-based drag and resize (keeps the stance, more work); ship a small MIT-licensed grid library inside `web/` (less work, but a dependency; it must be a local file, not a CDN link, so the page stays standalone).
+*Recommendation:* hand-roll first. A layout is small (widget id, position, size), so save it to `localStorage` and allow export and import as JSON alongside session export. Revisit if touch dragging gets fiddly.
 
 ---
 
