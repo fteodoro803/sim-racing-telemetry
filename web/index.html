@@ -2,90 +2,86 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101216">
+  <!-- Lets "Add to Home Screen" on an iPad open the page full-screen, without Safari's toolbars -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Sim Racing Telemetry</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <!-- ===== Title bar ===== -->
-  <header>
-    <a class="back" href="../">← Back to Lab</a>
-    <h1>Sim Racing Telemetry</h1>
-    <span class="badge" id="sourceBadge">Demo · simulated data</span>
+<div class="app">
+
+  <!-- ===== Top bar: source, connection status, demo controls ===== -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="back" id="backLink" href="../" hidden>← Back to Lab</a>
+      <span class="brand">TELEMETRY</span>
+      <button class="badge" id="sourceBadge" type="button" title="Change source">DEMO</button>
+      <span class="dot muted" id="statusDot"></span>
+      <span class="status" id="statusText" aria-live="polite"></span>
+    </div>
+    <div class="topbar-right" id="demoControls">
+      <button class="btn" id="playBtn" type="button">Pause</button>
+      <button class="btn" id="restartBtn" type="button">Restart</button>
+      <label class="speed">Speed
+        <select id="speedSel">
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="5" selected>5×</option>
+          <option value="10">10×</option>
+        </select>
+      </label>
+    </div>
   </header>
 
-  <!-- ===== Playback and comparison controls ===== -->
-  <div class="controls">
-    <button id="playBtn" type="button">Pause</button>
-    <button id="restartBtn" type="button">Restart</button>
-    <label>Speed
-      <select id="speedSel">
-        <option value="1">1×</option>
-        <option value="2">2×</option>
-        <option value="5" selected>5×</option>
-        <option value="10">10×</option>
-      </select>
-    </label>
-    <label>Compare to
-      <select id="compareSel">
-        <option value="best" selected>Best lap</option>
-        <option value="last">Last lap</option>
-      </select>
-    </label>
+  <!-- ===== Widget grid (filled in by app.js from layout.js) ===== -->
+  <main class="grid" id="grid"></main>
+
+  <!-- ===== Message shown over the grid until the first live frame arrives ===== -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="overlay-title" id="overlayTitle"></div>
+    <div class="overlay-text" id="overlayText"></div>
   </div>
+</div>
 
-  <!-- ===== Status line ===== -->
-  <p class="status" id="status" aria-live="polite"></p>
+<!-- ===== Setup panel: choose Demo or Live ===== -->
+<div class="modal" id="setup" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <div class="modal-head">
+      <h2 id="setupTitle">Connect to game</h2>
+      <button class="btn" id="setupClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabDemoBtn" type="button" role="tab" data-tab="demo">Demo</button>
+      <button class="tab" id="tabLiveBtn" type="button" role="tab" data-tab="live">Live</button>
+    </div>
 
-  <!-- ===== Lap readouts ===== -->
-  <section class="grid readouts" aria-label="Lap readouts">
-    <div class="panel"><div class="label">Current lap</div><div class="value big" id="curTime">–:––.–––</div><div class="small" id="curSub">&nbsp;</div></div>
-    <div class="panel"><div class="label">Delta</div><div class="value big" id="delta">±–.–––</div><div class="small" id="deltaSub">&nbsp;</div></div>
-    <div class="panel"><div class="label">Predicted</div><div class="value" id="predicted">–:––.–––</div></div>
-    <div class="panel"><div class="label">Last lap</div><div class="value" id="lastLap">–:––.–––</div><div class="small" id="lastSub">&nbsp;</div></div>
-    <div class="panel"><div class="label">Best lap</div><div class="value best" id="bestLap">–:––.–––</div><div class="small" id="bestSub">&nbsp;</div></div>
-  </section>
+    <div id="tabDemo">
+      <p class="modal-text">Replays a simulated session, so you can try the page with no game and no bridge.</p>
+      <button class="btn primary" id="useDemo" type="button">Use the demo</button>
+    </div>
 
-  <!-- ===== Sector cards (filled in by app.js) ===== -->
-  <section class="grid sectors" id="sectors" aria-label="Sectors"></section>
-
-  <!-- ===== Speed and delta charts ===== -->
-  <section class="grid charts">
-    <div class="panel">
-      <div class="chart-title">
-        <span class="label">Speed (km/h) over the lap</span>
-        <span class="legend"><span><i style="border-color:var(--accent)"></i>This lap</span><span><i style="border-color:var(--reference)"></i><span id="refName">Best lap</span></span></span>
+    <div id="tabLive" hidden>
+      <label class="field">Bridge address
+        <input id="address" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </label>
+      <p class="modal-hint" id="addressHint"></p>
+      <ol class="steps">
+        <li>Start the bridge on your computer</li>
+        <li>Start GT7</li>
+        <li>Connect</li>
+      </ol>
+      <div class="modal-actions">
+        <button class="btn primary" id="connectBtn" type="button">Connect</button>
+        <a class="link" id="bridgeLink" href="https://github.com/fteodoro803/sim-racing-telemetry/tree/main/bridge" target="_blank" rel="noopener">Download the bridge →</a>
       </div>
-      <canvas id="speedChart" role="img" aria-label="Speed against distance for the current and comparison lap"></canvas>
     </div>
-    <div class="panel">
-      <div class="chart-title">
-        <span class="label">Delta (s) over the lap</span>
-        <span class="legend">above zero = slower</span>
-      </div>
-      <canvas id="deltaChart" role="img" aria-label="Time delta against distance"></canvas>
-    </div>
-  </section>
+  </div>
+</div>
 
-  <!-- ===== Lap table ===== -->
-  <section class="panel">
-    <div class="label" style="margin-bottom:6px">Laps</div>
-    <div class="table-wrap">
-      <table>
-        <thead id="lapHead"></thead>
-        <tbody id="lapBody"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="lapEmpty">No completed laps yet.</div>
-  </section>
-
-  <!-- ===== Footer note ===== -->
-  <footer>
-    <p>This is a demo running on simulated laps. To see your own laps, a small local
-    bridge program relays your game's UDP telemetry to this page (coming soon).</p>
-  </footer>
-</main>
 <script type="module" src="app.js"></script>
 </body>
 </html>
