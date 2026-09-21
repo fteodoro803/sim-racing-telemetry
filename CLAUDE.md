@@ -41,7 +41,7 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 **Demo data is synthetic** and must stay labelled as such on the page. Regenerate `web/demo-laps.json` with `npm run demo-data`; commit the result.
 
 **Definition of done:**
-- `npm test` passes (Node 20+, no dependencies).
+- `npm test` passes (Node 20+, no dependencies), and `npm run test:bridge` passes for any bridge change.
 - For UI changes: `npm run serve`, load http://localhost:8000, check the browser console is clean, and check a phone-width viewport for horizontal overflow.
 - Logic changes come with a test; a bug fix comes with a regression test (see `BUGS.md`).
 - Affected docs are updated in the same change.

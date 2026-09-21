@@ -41,7 +41,7 @@ This project has no user roles or paid tiers, so the Role and Gated-by columns a
 
 | Feature | Surface | Status | Code ref | Notes |
 |---|---|---|---|---|
-| GT7 bridge (UDP → WebSocket) | Bridge | Planned | `bridge/` (stub) | [Known issues 1–2](PROJECT_CONTEXT.md); language: Python ([D15](DECISIONS.md)) |
+| GT7 bridge (UDP → WebSocket) | Bridge | Partial | `bridge/capture.py`, `bridge/gt7.py` | [Known issues 1–2](PROJECT_CONTEXT.md); language: Python ([D15](DECISIONS.md)) |
 | Live mode (WebSocket source) | Page | Planned | | Blocked by the bridge. [Known issues 3–4](PROJECT_CONTEXT.md) |
 | Track map | Page | Planned | | Own pass and plan doc. [D6](DECISIONS.md) |
 | User-defined sector splits | Page | Planned | | Placed on the track map. [D5](DECISIONS.md) |
