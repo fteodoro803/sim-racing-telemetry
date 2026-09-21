@@ -1,0 +1,44 @@
+## Project docs
+
+Working conventions for keeping this repo's documentation current. Read alongside:
+- [`DECISIONS.md`](DECISIONS.md) — open questions needing a human call, and the log of ones already made. **If you hit an unsettled convention or product question, add it there rather than picking one silently.**
+- [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) — what the project is, its origin, what's settled-but-unbuilt, and what's deferred.
+- [`BUGS.md`](BUGS.md) — confirmed/suspected bugs, organised by domain. **If you find a bug that isn't the task you're doing, log it there before moving on** — don't just mention it in conversation. Before fixing an entry, re-verify it still reproduces; once fixed, add a regression test and move it to the Resolved log.
+- [`FEATURE_MAP.md`](FEATURE_MAP.md) — what features exist and how far along they are. Update it whenever a feature ships, changes surface, or moves between `Planned`/`Designed`/`Implemented`.
+- `TRACK_MAP_PLAN.md` — will hold the design for the track map, split editor and track identification, plus an Implementation Log of what's actually been built. Create it when that pass starts.
+
+There is deliberately no design-system doc or architecture-map doc (see D10 in `DECISIONS.md`); the README covers layout and the frame format.
+
+**Where things go** (three different questions, three different files):
+- What we want isn't settled → `DECISIONS.md` (Open).
+- What we want is settled, but it isn't built or is incomplete → `PROJECT_CONTEXT.md` (Known issues).
+- Something that's supposed to work doesn't → `BUGS.md`.
+
+**When something is decided:** move the item to the Decided log with a one-line rationale, and fold the rule itself into this file (if it's a convention) or `PROJECT_CONTEXT.md` (if it creates work). Don't leave the answer only in `DECISIONS.md`.
+
+**Habits that keep the docs trustworthy:**
+- Resolve in place — strike through or move to a Resolved log; never delete an entry.
+- Never renumber — other docs cross-reference `D12`, `BUG-7`, issue numbers. Gaps are fine.
+- When behaviour, setup, or commands change, update the affected doc in the same change.
+
+## Conventions
+
+How code is written in this project. A decision in `DECISIONS.md` that creates a convention gets folded in here once it's decided.
+
+**Comments:** use the `outline-style-comments` skill whenever writing or reviewing code comments or docstrings, including existing code (D9). In short: explain why, not what; the first line is a self-contained summary so folded code still reads clearly, with detail beneath it; number ordered steps; give distinct JSX/markup blocks banner comments.
+
+**Published folder:** only `web/` is published to the portfolio (D3). Keep it static and standalone: relative paths only (`app.js`, never `/app.js`), no dependency on the portfolio's CSS or JS, no build step, no runtime dependencies, and a `<a href="../">Back to Lab</a>` link. Keep everything else (bridge, tools, tests, docs) outside it.
+
+**Frame format is the contract.** Every source (demo, and each game's bridge decoder) produces the normalised frame described in the README, and `web/timing.js` only ever sees that. Game-specific knowledge belongs in a decoder, never in the timing or UI code.
+
+**Timing logic stays DOM-free and tested.** `web/timing.js`, `web/demo-source.js` and `web/format.js` must run under Node so `tests/` can cover them. Units: times in milliseconds, progress in metres, speed in km/h, pedals 0–100.
+
+**Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
+
+**Demo data is synthetic** and must stay labelled as such on the page. Regenerate `web/demo-laps.json` with `npm run demo-data`; commit the result.
+
+**Definition of done:**
+- `npm test` passes (Node 20+, no dependencies).
+- For UI changes: `npm run serve`, load http://localhost:8000, check the browser console is clean, and check a phone-width viewport for horizontal overflow.
+- Logic changes come with a test; a bug fix comes with a regression test (see `BUGS.md`).
+- Affected docs are updated in the same change.
