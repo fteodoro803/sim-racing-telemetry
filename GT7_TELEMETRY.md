@@ -2,7 +2,7 @@
 
 What Gran Turismo 7 sends over UDP, its units and quirks, and what this project does with each field. It is the menu we choose from when adding features: the "In this project" column says what is planned for each field.
 
-> **Status: partly confirmed.** The transport details and the type-A byte offsets below are confirmed by a working open-source implementation (gt7dashboard). Everything else is assembled from community parser documentation (see Sources), and nothing has yet been checked against real packets from this project. Do that during the bridge work and mark items verified here. Companion docs: [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) (known issues, especially 2, 5 and 6), [`DECISIONS.md`](DECISIONS.md), [`FEATURE_MAP.md`](FEATURE_MAP.md).
+> **Status: partly confirmed, and now checked against a real PS4.** The transport details and the type-A byte offsets below are confirmed by a working open-source implementation (gt7dashboard), and an 11-minute type-A session recorded from a real PS4 (2026-09-22) confirmed the encryption, the heartbeat, the packet rate, the pause and loading flags, and several fields; see "Confirmed on a real PS4". Everything else is assembled from community parser documentation (see Sources). Companion docs: [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) (known issues, especially 2, 5 and 6), [`DECISIONS.md`](DECISIONS.md), [`FEATURE_MAP.md`](FEATURE_MAP.md).
 
 ## Transport
 
@@ -23,6 +23,23 @@ What Gran Turismo 7 sends over UDP, its units and quirks, and what this project 
 | `C` | 368 bytes | Current lap time, surface type per tyre, steering angle, wheelbase, car category | All modes |
 
 Each type contains everything from the ones before it. **Recommendation: request `C`.** It has the most, it works in every mode, and it is the only one with the current lap time. It is newer (added around game update 1.68), so confirm it is sent on the game version in use, and fall back to `A` if not.
+
+### Confirmed on a real PS4
+
+From a recorded type-A session, about 66,000 packets, in a free run or time trial (a single car, one track), over home Wi-Fi to a Mac.
+
+- **Transport:** the heartbeat `A` to port 33739 works with no console setting. Every packet decrypted with nonce constant `0xDEADBEAF`, each 296 bytes, with consecutive packet ids and no loss.
+- **Packet rate is not exactly 60 a second.** It averaged 59.83 and wandered between 59.65 and 59.94, so a packet count is not a clock. Arrival times are jittery (a few ms of spread, with a stall of about 300 ms once).
+- **`0x80` is a game clock.** It is the game's time of day in ms (it started at exactly 15:30:00). It advances one game frame (16 or 17 ms) per packet, stands still while the game is paused, and its differences between lap changes match the game's own lap times to within a frame. Because it is simulation time, it runs about 0.3% slower than wall-clock time when the console drops frames, and the game's lap times follow it. The bridge uses it as the frame clock when it is seen to run at real time (`GameClock` in `bridge/frames.py`); time of day can be accelerated in some events, so this is checked rather than assumed.
+- **Pause:** flag bit 1 is set while the game is paused, packets keep arriving, and the game clock stands still. So a lap that includes a pause has a wall-clock time longer than the game's.
+- **Lap counter and last lap:** the game updates `last_lap` in the same packet that changes the lap counter. After a session restart the counter reads 0 until the first crossing of the line.
+- **Flags:** bit 0 (on track) was set for about 99% of packets, bit 2 (loading) for a handful, and bits 3 (in gear) and 5 (rev-limit alert) behaved plausibly. Bit 6, documented as the handbrake, was set for about a third of the session, which doesn't fit, so its meaning is unconfirmed.
+- **Gear:** values 0 to 8 were seen; 0 is presumably neutral (a short stretch at the start). The suggested gear is 15 when there is no suggestion (about two thirds of packets), as documented.
+- **Rev markers:** for this car the rev warning was 6500 and the limiter 7000; rpm ran from about 640 to 6930. The estimated top speed was 283 (km/h, consistent with a top speed of 250).
+- **Position:** `x` and `z` spanned about ±850 m and `y` (height) only ±5 m, so `x, z` is the ground plane.
+- **Constants:** water and oil temperature were fixed at 85 and 110, as documented, so they carry no information.
+- **Race fields:** `0x76` (laps in race) was 0 in free run, as expected there. The values at `0x84` and `0x86` were mostly `(1, 3)`, sometimes `(1, 1)` or `(-1, -1)`; which interpretation is right is still unclear.
+- **Boost:** `0x50` read 0 throughout, and the car had no turbo, so that offset is still unconfirmed.
 
 ### Type A byte offsets (confirmed by gt7dashboard)
 
@@ -45,7 +62,7 @@ Offsets into the decrypted packet. All little-endian. Fields not listed here (pa
 | `0x70` | int32 | Packet id |
 | `0x74` | int16 | Lap count |
 | `0x78`, `0x7C` | int32 | Best lap, last lap (ms) |
-| `0x80` | int32 | Time value (ms); see the note under Timing |
+| `0x80` | int32 | Game clock: time of day in ms (confirmed on a real PS4; see above) |
 | `0x84`, `0x86` | int16 | Race position values; see the note under Timing |
 | `0x88`, `0x8A` | uint16 | Rev warning rpm, rev limiter rpm |
 | `0x8C` | int16 | Estimated top speed |
@@ -59,7 +76,7 @@ Offsets into the decrypted packet. All little-endian. Fields not listed here (pa
 | `0x104`–`0x120` | float | Gear ratios ×8 |
 | `0x124` | int32 | Car id |
 
-Not confirmed by that implementation but in the parser docs: `totalLaps` (probably int16 at `0x76`), boost (probably `0x50`), road plane values (`0x94`–`0xA0`), transmission top speed (probably `0x100`).
+Not confirmed by that implementation but in the parser docs: `totalLaps` (probably int16 at `0x76`; it read 0 in a free run, as expected), boost (probably `0x50`; unconfirmed, the test car had no turbo), road plane values (`0x94`–`0xA0`), transmission top speed (probably `0x100`).
 
 ## Fields
 
@@ -95,7 +112,7 @@ Not confirmed by that implementation but in the parser docs: `totalLaps` (probab
 | `lastLaptime` | int32, ms | `-1` if none. Used as the lap time when above zero | v1 (in the frame as `lastLap`) |
 | `currentLap` (C) | int32, ms | Current lap time. The tracker computes its own from frame timestamps; this can cross-check it | v1 (cross-check) |
 | `raceStartPosition`, `preRaceNumCars` (`0x84`, `0x86`) | int16 | One parser documents these as start position and number of cars (`-1` once the race starts); gt7dashboard reads them as current position and total positions. Unclear which is right; check in a real race | later |
-| `dayProgression` (`0x80`) | int32, ms | Documented as time-of-day progression; gt7dashboard reads it as time on track. Unclear which is right; check with real packets | no |
+| `dayProgression` (`0x80`) | int32, ms | **Confirmed: the game's time of day in ms, ticking one frame per packet and standing still while paused.** Used as the frame clock ([O14](DECISIONS.md)) | v1 (as the clock) |
 | *(sector times)* | | **Not provided.** Derived from position ([D5](DECISIONS.md)) | v1 (derived) |
 
 ### Position and motion
@@ -144,7 +161,7 @@ A 16-bit field. Bits 0–2 also drive the interrupted-lap handling ([D7](DECISIO
 | 3 | In gear | no |
 | 4 | Has turbo | no |
 | 5 | Rev-limit alert | no |
-| 6 | Handbrake active | no |
+| 6 | Handbrake active | no (set for a third of a normal session, so the meaning is unconfirmed) |
 | 7 | Lights active | no |
 | 8 | High beams | no |
 | 9 | Low beams | no |

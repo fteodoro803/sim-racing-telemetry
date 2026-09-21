@@ -22,7 +22,7 @@ from pathlib import Path
 
 from capture import capture, report
 from fake_console import FakeConsole
-from frames import to_frame
+from frames import GameClock, to_frame
 from gt7 import HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT, check_console_address
 from ws_server import Hub, make_server
 
@@ -49,13 +49,14 @@ class Bridge:
         self.server = make_server(host, http_port, web_dir, self.hub, info, hello)
         self.port = self.server.server_address[1]
         self.stats = None
+        self.clock = GameClock()
         self.error = None     # set if the capture stops because of an error, so the bridge can say so and exit
         self._stop = threading.Event()
         self._threads = []
 
     def _on_decoded(self, decoded, seconds):
         """Convert a decoded packet to a frame and broadcast it to every connected browser."""
-        frame = to_frame(decoded, seconds * 1000)
+        frame = to_frame(decoded, self.clock.update(decoded["time_value"], seconds * 1000))
         self.hub.broadcast_frame(json.dumps({"type": "frame", **frame}, separators=(",", ":")))
 
     def _status_loop(self):

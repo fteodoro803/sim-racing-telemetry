@@ -64,7 +64,10 @@ Plain ES modules, two hand-drawn canvas charts, and a pure-Python demo generator
 Made-up circuit from `tools/make_demo.py`; the page says "Demo · simulated data". It skips the first two laps so deltas show at once, plays at 5× by default, and ends after lap 8 with a Replay button.
 
 **O11. The specifics of interrupted-lap handling.**
-D7 settled the principle. These details were Claude's: frames flagged `paused`, `loading` or `onTrack: false` are dropped; the timing clock skips the gap (assuming the game clock stands still); an interrupted lap is kept in the table but excluded from best lap, best sectors, theoretical best, the "last lap" comparison and the reference lap. Revisit with real packets ([`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 5).
+D7 settled the principle. These details were Claude's: frames flagged `paused`, `loading` or `onTrack: false` are dropped; the timing clock skips the gap (assuming the game clock stands still, which a real PS4 session confirmed on 2026-09-22); an interrupted lap is kept in the table but excluded from best lap, best sectors, theoretical best, the "last lap" comparison and the reference lap. Revisit with real packets ([`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 5).
+
+**O14. Frame timestamps come from the game's own clock when it can be trusted, and from arrival time otherwise.**
+The bridge first stamped frames with the time the packet arrived. On a real session that carried Wi-Fi jitter (delta wobbled by several ms, with a 100 ms spike) and ran about 0.3% off the game's time, so a lap timed from timestamps alone came out 384 ms off the game's own lap time. The packet carries a game clock (`0x80`, time of day in ms) that matched the game's lap times to a frame, cutting delta noise from 4.3 ms to 0.3 ms and the lap-time error to 9 ms. Tradeoff: time of day can be accelerated in some events, so the bridge uses the clock only after seeing it run at about real time (95–105% over roughly 10 s of packets), and falls back to arrival time otherwise, so `t` is always continuous and never goes backwards. Packet ids were rejected as a clock because the packet rate wanders between 59.65 and 59.94 a second.
 
 ---
 

@@ -287,14 +287,14 @@ class BridgeEndToEndTest(unittest.TestCase):
             sock.settimeout(4)
             messages, frames = [], []
             deadline = time.time() + 5
-            while len(frames) < 40 and time.time() < deadline:
+            while len(frames) < 90 and time.time() < deadline:
                 opcode, payload = read_frame(sock)
                 msg = json.loads(payload)
                 messages.append(msg["type"])
                 if msg["type"] == "frame":
                     frames.append(msg)
             self.assertEqual(messages[0], "hello")
-            self.assertGreaterEqual(len(frames), 40)
+            self.assertGreaterEqual(len(frames), 90)
             f = frames[-1]
             speeds = [m["speed"] for m in frames]
             mean = 2 * 3.141592653589793 * 6.0 * 3.6                # circumference over the lap time, in km/h
@@ -306,6 +306,9 @@ class BridgeEndToEndTest(unittest.TestCase):
             self.assertFalse(f["paused"])
             ts = [m["t"] for m in frames]
             self.assertEqual(ts, sorted(ts))                      # time only moves forward
+            # Once the game clock has earned trust, frames step by exactly the game's ticks (16 or 17 ms)
+            steps = [b - a for a, b in zip(ts[-30:], ts[-29:])]
+            self.assertTrue(all(abs(s - 16) < 0.01 or abs(s - 17) < 0.01 for s in steps), steps)
             sock.close()
 
             # The page is served too, and identifies the bridge.

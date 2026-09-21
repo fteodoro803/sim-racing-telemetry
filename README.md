@@ -4,8 +4,8 @@ A dashboard that shows live racing-game telemetry: lap and sector times, deltas 
 or last lap, speed, gear, rpm and pedals. Built for Gran Turismo 7 first, and for an iPad in landscape
 beside the sim; other games later.
 
-Status: **the demo, the bridge and the live dashboard all work end to end against a fake console.
-It has not yet been run against a real PS4 or an iPad.**
+Status: **the demo, the bridge and the live dashboard work end to end, against a fake console and a
+real PS4 (checked from a Mac browser). The iPad is not yet tested.**
 Known issues and open questions live in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) and [DECISIONS.md](DECISIONS.md); features and their status in [FEATURE_MAP.md](FEATURE_MAP.md).
 
 ## How it fits together
@@ -81,7 +81,7 @@ Every source (demo, and each game's bridge decoder) produces the same normalised
 
 | field | unit | notes |
 |---|---|---|
-| `t` | ms | monotonic timestamp of the frame |
+| `t` | ms | monotonic timestamp of the frame. The bridge uses the game's own clock when it can be trusted, and arrival time otherwise |
 | `lap` | int | the game's lap counter. A change means the car crossed the line |
 | `x`, `z` | m | position on the ground plane |
 | `speed` | km/h | |

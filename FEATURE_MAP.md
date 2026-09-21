@@ -34,12 +34,12 @@ This project has no user roles or paid tiers, so the Role and Gated-by columns a
 | Theoretical best lap | Page | Implemented | `web/timing.js` (`theoreticalBest`) | Sum of the best valid sector times |
 | Lap table with sector columns | Page | Implemented | `web/widgets.js` | Game lap numbers; best sectors and best lap highlighted; interrupted laps greyed |
 | Delta chart | Page | Implemented | `web/widgets.js`, `web/charts.js` | Green below zero, red above; split markers drawn. The speed chart is not yet a widget (palette-only, later) |
-| Driving widgets (speed, gear and suggested gear, rpm with rev markers, pedals) | Page | Partial | `web/widgets.js` | Built; untested on real data. [Known issues 13, 15](PROJECT_CONTEXT.md) |
+| Driving widgets (speed, gear and suggested gear, rpm with rev markers, pedals) | Page | Implemented | `web/widgets.js` | Confirmed responding to real PS4 data (2026-09-22). Reverse gear and boost unchecked. [Known issue 15](PROJECT_CONTEXT.md) |
 | Setup panel and connection states | Page | Implemented | `web/app.js`, `web/live-source.js` | Demo or Live, bridge address, connecting / waiting for GT7 / live / lost. Checked against the fake console |
-| Live mode (WebSocket source) | Page | Partial | `web/live-source.js` | Works against the fake console; untested on a real console. [Known issue 15](PROJECT_CONTEXT.md) |
-| GT7 bridge (UDP → WebSocket) | Bridge | Partial | `bridge/bridge.py`, `bridge/gt7.py`, `bridge/frames.py` | Type A only; untested on a real console. [Known issues 1–2, 15](PROJECT_CONTEXT.md); Python ([D15](DECISIONS.md)) |
+| Live mode (WebSocket source) | Page | Implemented | `web/live-source.js` | Works with a real PS4 via a Mac browser. iPad untested. [Known issue 15](PROJECT_CONTEXT.md) |
+| GT7 bridge (UDP → WebSocket) | Bridge | Partial | `bridge/bridge.py`, `bridge/gt7.py`, `bridge/frames.py` | Works with a real PS4; type A only. Frames use the game's clock when trusted ([O14](DECISIONS.md)). [Known issues 1–2](PROJECT_CONTEXT.md); Python ([D15](DECISIONS.md)) |
 | Page served by the bridge over http on the local network (for an iPad) | Bridge | Partial | `bridge/ws_server.py` | Checked from a desktop browser only. [D16](DECISIONS.md) |
-| Interrupted-lap handling (paused / loading / off track) | Page | Partial | `web/timing.js` (`ingest`) | First pass, untested against real packets. [D7](DECISIONS.md), [O11](DECISIONS.md), [Known issue 5](PROJECT_CONTEXT.md) |
+| Interrupted-lap handling (paused / loading / off track) | Page | Partial | `web/timing.js` (`ingest`) | Pause behaviour confirmed on a real PS4; restart and replay not yet seen. [D7](DECISIONS.md), [O11](DECISIONS.md), [Known issue 5](PROJECT_CONTEXT.md) |
 
 ---
 
