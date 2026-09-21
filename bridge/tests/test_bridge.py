@@ -1,6 +1,7 @@
 import base64
 import http.client
 import json
+import math
 import os
 import socket
 import struct
@@ -28,8 +29,9 @@ class FrameConversionTest(unittest.TestCase):
         f = to_frame(self.decoded, t_ms=1234.5678)
         self.assertEqual(f["t"], 1234.568)
         self.assertEqual(f["lap"], 2)
-        self.assertAlmostEqual(f["speed"], 226.19, places=1)           # 62.83 m/s in km/h
-        self.assertEqual((f["gear"], f["suggestedGear"]), (4, 5))
+        self.assertAlmostEqual(f["speed"], self.decoded["speed_ms"] * 3.6, places=1)   # m/s to km/h
+        self.assertEqual(f["gear"], self.decoded["gear"])
+        self.assertGreaterEqual(f["suggestedGear"], f["gear"])
         self.assertEqual((f["rpmWarning"], f["rpmLimiter"]), (7000, 8200))
         self.assertLessEqual(f["throttle"], 100)
         self.assertLessEqual(f["brake"], 100)
@@ -60,6 +62,44 @@ class FrameConversionTest(unittest.TestCase):
 
     def test_the_frame_is_json_serialisable(self):
         json.dumps(to_frame(self.decoded, 0))
+
+
+class FakeConsoleMotionTest(unittest.TestCase):
+    """The fake car should move like a car: varied and self-consistent, not constant numbers."""
+
+    def samples(self, lap_seconds=20.0, radius=200.0, n=2000):
+        return [decode_a(build_packet(lap_seconds * i / n, i, lap_seconds=lap_seconds, radius=radius))
+                for i in range(n)]
+
+    def test_speed_gear_rpm_and_pedals_all_vary(self):
+        s = self.samples()
+        speeds = [d["speed_ms"] for d in s]
+        self.assertGreater(max(speeds) / min(speeds), 1.5)
+        self.assertGreater(len({d["gear"] for d in s}), 2)
+        self.assertGreater(max(d["rpm"] for d in s) - min(d["rpm"] for d in s), 2000)
+        self.assertTrue(any(d["throttle"] == 255 for d in s))
+        self.assertTrue(any(d["brake"] > 0 for d in s))
+        suggestions = {d["suggested_gear"] for d in s}
+        self.assertIn(15, suggestions)                                   # sometimes no suggestion
+        self.assertTrue(any(g != 15 and g > d["gear"] for d in s for g in [d["suggested_gear"]]))
+
+    def test_speed_is_consistent_with_position_and_lap_time(self):
+        # Distance covered at the reported speed over one lap is the circumference of the circle.
+        lap, radius, n = 20.0, 200.0, 4000
+        s = self.samples(lap, radius, n)
+        distance = sum(d["speed_ms"] for d in s) * (lap / n)
+        self.assertAlmostEqual(distance / (2 * math.pi * radius), 1.0, delta=0.01)
+
+    def test_pedals_never_overlap_hard(self):
+        for d in self.samples():
+            self.assertFalse(d["throttle"] == 255 and d["brake"] > 0)
+
+    def test_gear_matches_speed(self):
+        from fake_console import GEAR_UP
+        for d in self.samples():
+            kmh = d["speed_ms"] * 3.6
+            expected = max(i for i, threshold in enumerate(GEAR_UP) if kmh >= threshold) + 1
+            self.assertEqual(d["gear"], expected)
 
 
 class WebSocketFramingTest(unittest.TestCase):
@@ -185,7 +225,8 @@ class BridgeEndToEndTest(unittest.TestCase):
     def test_frames_flow_from_the_console_to_a_browser(self):
         web = tempfile.mkdtemp()
         Path(web, "index.html").write_text("ok")
-        console = FakeConsole(listen_port=0, lap_seconds=1.0, say=lambda m: None)
+        # Fast 1 s laps on a small circle keep the speeds in a realistic range (about 90-180 km/h)
+        console = FakeConsole(listen_port=0, lap_seconds=1.0, radius=6.0, say=lambda m: None)
         console.start()
         bridge = Bridge("127.0.0.1", heartbeat_port=console.port, telemetry_port=0, host="127.0.0.1",
                         http_port=0, web_dir=web, say=lambda m: None)
@@ -205,8 +246,12 @@ class BridgeEndToEndTest(unittest.TestCase):
             self.assertEqual(messages[0], "hello")
             self.assertGreaterEqual(len(frames), 40)
             f = frames[-1]
-            self.assertAlmostEqual(f["speed"], 2 * 3.141592653589793 * 200 * 3.6, delta=0.5)   # 1 s laps
-            self.assertEqual(f["gear"], 4)
+            speeds = [m["speed"] for m in frames]
+            mean = 2 * 3.141592653589793 * 6.0 * 3.6                # circumference over the lap time, in km/h
+            self.assertTrue(all(0.6 * mean < s < 1.5 * mean for s in speeds))   # swings about -30% to +44% of the mean
+            self.assertGreater(max(speeds) / min(speeds), 1.3)      # speed really varies
+            self.assertGreater(len({m["gear"] for m in frames}), 1) # and so does the gear
+            self.assertAlmostEqual(f["x"] ** 2 + f["z"] ** 2, 36.0, delta=0.5)
             self.assertTrue(f["onTrack"])
             self.assertFalse(f["paused"])
             ts = [m["t"] for m in frames]
