@@ -6,6 +6,7 @@ Working conventions for keeping this repo's documentation current. Read alongsid
 - [`BUGS.md`](BUGS.md) — confirmed/suspected bugs, organised by domain. **If you find a bug that isn't the task you're doing, log it there before moving on** — don't just mention it in conversation. Before fixing an entry, re-verify it still reproduces; once fixed, add a regression test and move it to the Resolved log.
 - [`FEATURE_MAP.md`](FEATURE_MAP.md) — what features exist and how far along they are. Update it whenever a feature ships, changes surface, or moves between `Planned`/`Designed`/`Implemented`.
 - [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) — what GT7's telemetry packet provides, its units and quirks, and what this project does with each field. Update it when something about the packet is verified or turns out to be wrong, and when a field starts being used.
+- [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) — the dashboard's grid spec, widget list, wireframe corrections and build order, with an Implementation Log. Keep the log current as the dashboard is built.
 - `TRACK_MAP_PLAN.md` — will hold the design for the track map, split editor and track identification, plus an Implementation Log of what's actually been built. Create it when that pass starts.
 
 There is deliberately no design-system doc or architecture-map doc (see D10 in `DECISIONS.md`); the README covers layout and the frame format.

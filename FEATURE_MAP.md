@@ -52,5 +52,7 @@ This project has no user roles or paid tiers, so the Role and Gated-by columns a
 | Export laps to the car log | Page | Planned | | Depends on a separate Lab entry that doesn't exist yet |
 | Customisable dashboard (choose widgets and snap them into a grid; basic presets plus a Custom layout) | Page | Planned | | [Known issue 11](PROJECT_CONTEXT.md); [D11](DECISIONS.md); library question [O13](DECISIONS.md) |
 | Tyre widget (tyre graphics that change colour with temperature, no numeric labels) | Page | Planned | | Later, on its own pass: the colour ranges need real data. [D12](DECISIONS.md) |
-| Driving widgets (speed, pedals and clutch, gear and suggested gear, rpm and rev-limit indicator, boost, steering, driver-aid indicators) | Page | Planned | | First proper version. [Known issues 12–13](PROJECT_CONTEXT.md); fields in [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
+| Driving widgets (speed, gear and suggested gear, rpm with rev markers, pedals) | Page | Planned | | First proper version. [Known issues 12–13](PROJECT_CONTEXT.md); fields in [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); design and sizes in [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) |
+| Steering widget | Page | Planned | | Its own session. [Known issue 14](PROJECT_CONTEXT.md) |
 | Fuel widget (level, consumption, laps remaining) | Page | Planned | | Later, not in the first version. Needs fuel channels in the frame format |
+| Page served by the bridge over http on the local network (for an iPad) | Bridge | Planned | | [D16](DECISIONS.md); [Known issue 1](PROJECT_CONTEXT.md) |
