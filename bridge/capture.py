@@ -5,7 +5,7 @@ This is the first slice of the bridge: it proves the console is sending data, th
 it, and gives us real packets to build and test the decoder against. Nothing to install; it uses
 only the Python standard library.
 
-    python3 bridge/capture.py --ps4-ip 192.168.1.20 --out session.jsonl.gz
+    python3 bridge/capture.py --ps4-ip YOUR-PS4-IP --out session.jsonl.gz
 
 The console must be on the same network as this machine, and GT7 must be running (in a race, a
 time trial, or free practice; menus may send nothing). No setting on the console is needed.
@@ -17,8 +17,8 @@ import time
 from dataclasses import dataclass, field
 
 from capture_file import CaptureWriter
-from gt7 import (HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT, Decryptor, decode_a, decode_flags,
-                 heartbeat)
+from gt7 import (HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT, Decryptor, check_console_address, decode_a,
+                 decode_flags, heartbeat)
 
 HEARTBEAT_EVERY_S = 5.0    # the console needs one every ~16 s at most; this is comfortably inside
 NO_DATA_HINT_AFTER_S = 3.0
@@ -66,20 +66,28 @@ def capture(console_ip, *, packet_type="A", send_port=HEARTBEAT_PORT, recv_port=
 
     stats = Stats()
     decrypt = Decryptor()
-    writer = CaptureWriter(out, console=console_ip, packet_type=packet_type) if out else None
+    writer = None
     started = time.monotonic()
     last_heartbeat = float("-inf")
     last_summary = float("-inf")
     last_id = None
     warned_no_data = False
+    warned_send = False
 
     try:
+        if out:
+            writer = CaptureWriter(out, console=console_ip, packet_type=packet_type)
         while (seconds is None or time.monotonic() - started < seconds) and not (stop and stop.is_set()):
             now = time.monotonic()
 
             # 2. Keep the console sending: it stops if the heartbeat lapses
             if now - last_heartbeat >= HEARTBEAT_EVERY_S:
-                sock.sendto(heartbeat(packet_type), (console_ip, send_port))
+                try:
+                    sock.sendto(heartbeat(packet_type), (console_ip, send_port))
+                except OSError as err:   # for example no route to the console; keep trying
+                    if not warned_send:
+                        say(f"Couldn't reach {console_ip}: {err}. Will keep trying.")
+                        warned_send = True
                 last_heartbeat = now
 
             # 3. Receive a packet, and say something helpful if nothing is arriving
@@ -155,6 +163,10 @@ def main(argv=None):
     parser.add_argument("--out", help="record raw packets to this file (.gz to compress)")
     parser.add_argument("--seconds", type=float, help="stop after this many seconds")
     args = parser.parse_args(argv)
+    try:
+        check_console_address(args.ip)
+    except ValueError as err:
+        parser.error(str(err))
 
     print(f"Asking {args.ip} for type-{args.packet_type} packets. Press Ctrl-C to stop.")
     stats = capture(args.ip, packet_type=args.packet_type, seconds=args.seconds, out=args.out)

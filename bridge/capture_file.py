@@ -3,13 +3,14 @@
 A capture is a JSON-lines file (gzip-compressed if the name ends in `.gz`). The first line is a
 header describing the recording; every later line is one packet as it arrived, still encrypted:
 
-    {"format": "gt7-capture-1", "started": "...", "console": "192.168.1.20", "packet_type": "A"}
+    {"format": "gt7-capture-1", "started": "...", "console": "<the console's IP address>", "packet_type": "A"}
     {"t": 0.0172, "hex": "..."}
 
 Packets are stored raw, not decoded, so a capture stays useful after the decoder improves.
 """
 import gzip
 import json
+import os
 from datetime import datetime, timezone
 
 FORMAT = "gt7-capture-1"
@@ -26,6 +27,9 @@ class CaptureWriter:
     """Writes packets to a capture file as they arrive. Use as a context manager."""
 
     def __init__(self, path, *, console, packet_type):
+        folder = os.path.dirname(os.fspath(path))
+        if folder:
+            os.makedirs(folder, exist_ok=True)   # so `--out captures/x.gz` works before captures/ exists
         self._file = _open(path, "w")
         header = {
             "format": FORMAT,
@@ -50,13 +54,27 @@ class CaptureWriter:
 
 
 def read_capture(path):
-    """Read a capture file. Returns (header, list of (t, packet bytes))."""
+    """Read a capture file. Returns (header, list of (t, packet bytes)).
+
+    A capture cut short (the bridge was killed, or the machine went to sleep, before the file was
+    closed) still yields every packet up to the cut, and the header gets `"truncated": True`.
+    """
+    packets = []
+    truncated = False
     with _open(path, "r") as f:
         header = json.loads(f.readline())
         if header.get("format") != FORMAT:
             raise ValueError(f"not a {FORMAT} file: {path}")
-        packets = []
-        for line in f:
-            row = json.loads(line)
-            packets.append((row["t"], bytes.fromhex(row["hex"])))
+        try:
+            for line in f:
+                try:
+                    row = json.loads(line)
+                    packets.append((row["t"], bytes.fromhex(row["hex"])))
+                except (ValueError, KeyError):
+                    truncated = True   # a half-written last line
+                    break
+        except EOFError:               # a gzip file whose end was never written
+            truncated = True
+    if truncated:
+        header["truncated"] = True
     return header, packets

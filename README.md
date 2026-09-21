@@ -50,12 +50,12 @@ To try the whole live path with no console (a built-in fake console sends made-u
 python3 bridge/bridge.py --fake-console
 ```
 
-To use a real PS4, give the bridge its IP address (Settings > Network > View Connection Status), start
-GT7, and open the address the bridge prints, on this computer or on your iPad. More in
-[bridge/README.md](bridge/README.md):
+To use a real PS4, replace `YOUR-PS4-IP` with its own IP address (on the PS4: Settings > Network > View
+Connection Status), start GT7, and open the address the bridge prints, on this computer or on your iPad.
+More in [bridge/README.md](bridge/README.md):
 
 ```bash
-python3 bridge/bridge.py --ps4-ip 192.168.1.20
+python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP
 ```
 
 Tests:

@@ -1,5 +1,7 @@
 import base64
+import contextlib
 import http.client
+import io
 import json
 import math
 import os
@@ -13,7 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bridge import Bridge
+from bridge import Bridge, main
+from capture import capture
 from fake_console import FakeConsole, build_packet
 from frames import to_frame
 from gt7 import decode_a
@@ -217,6 +220,53 @@ class ServerTest(unittest.TestCase):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
         conn.request("GET", "/ws", headers={"Upgrade": "websocket", "Connection": "Upgrade"})
         self.assertEqual(conn.getresponse().status, 400)
+
+
+class BridgeFailureTest(unittest.TestCase):
+    """Problems must be reported, not swallowed by a background thread while the page sits waiting."""
+
+    def test_a_capture_that_cannot_start_is_reported(self):
+        blocker = tempfile.NamedTemporaryFile(delete=False)          # a file where a folder is needed
+        bridge = Bridge("127.0.0.1", heartbeat_port=9, telemetry_port=0, host="127.0.0.1", http_port=0,
+                        web_dir=tempfile.mkdtemp(), record=os.path.join(blocker.name, "sub", "x.gz"),
+                        say=lambda m: None)
+        bridge.start()
+        try:
+            deadline = time.time() + 3
+            while bridge.error is None and time.time() < deadline:
+                time.sleep(0.05)
+            self.assertIsInstance(bridge.error, OSError)
+        finally:
+            bridge.stop()
+
+    def test_a_missing_record_folder_is_created(self):
+        folder = os.path.join(tempfile.mkdtemp(), "captures")         # doesn't exist yet
+        console = FakeConsole(listen_port=0, say=lambda m: None)
+        console.start()
+        bridge = Bridge("127.0.0.1", heartbeat_port=console.port, telemetry_port=0, host="127.0.0.1",
+                        http_port=0, web_dir=tempfile.mkdtemp(), record=os.path.join(folder, "s.jsonl.gz"),
+                        say=lambda m: None)
+        bridge.start()
+        try:
+            time.sleep(1.0)
+            self.assertIsNone(bridge.error)
+        finally:
+            bridge.stop()
+            console.stop()
+        self.assertTrue(os.path.exists(os.path.join(folder, "s.jsonl.gz")))
+
+    def test_a_placeholder_address_is_rejected_before_anything_starts(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as caught:
+            main(["--ps4-ip", "YOUR-PS4-IP"])
+        self.assertEqual(caught.exception.code, 2)
+        self.assertIn("is not an IP address", err.getvalue())
+
+    def test_an_unreachable_console_does_not_crash_the_capture(self):
+        # Sending to port 0 fails on most systems; the capture should note it and carry on.
+        lines = []
+        stats = capture("127.0.0.1", send_port=0, recv_port=0, seconds=1.0, say=lines.append)
+        self.assertEqual(stats.packets, 0)
 
 
 class BridgeEndToEndTest(unittest.TestCase):

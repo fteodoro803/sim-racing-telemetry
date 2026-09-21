@@ -37,7 +37,14 @@ Resolved entries additionally carry `**Fix:**` (commit/PR) and `**Regression tes
 
 ## Resolved
 
-*None yet.*
+### BUG-1 — The bridge kept running silently after its capture failed
+**Status:** Resolved
+**Found:** 2026-09-22, on the first attempt to run the bridge against a real PS4
+**Symptom:** `bridge.py --ps4-ip <ip> --record captures/x.gz` printed a traceback (`FileNotFoundError`) from a background thread, but the bridge carried on serving the page, which would then have shown "waiting for GT7" forever with nothing to say why.
+**Repro:** run with `--record` pointing into a folder that doesn't exist (`captures/` is gitignored, so a fresh clone has none). The same silent death would follow any capture failure, such as the telemetry port being taken.
+**Root cause:** two faults. `CaptureWriter` didn't create the folder, and the README told users to record into `captures/` without creating it. Separately, an exception in the capture thread only ended that thread; nothing noticed. The failed capture also leaked the socket it had already opened.
+**Fix:** `CaptureWriter` creates missing folders; the bridge records a capture failure, prints it and exits non-zero; the capture closes its socket on every failure path; a placeholder or mistyped console address is rejected up front with a message saying where to find the real one; a failed heartbeat send is reported and retried instead of ending the capture; and a capture cut short (process killed) still reads back everything before the cut.
+**Regression tests:** `bridge/tests/test_bridge.py` (`BridgeFailureTest`: a failing capture is reported, a missing record folder is created, a placeholder address is rejected, an unreachable console doesn't crash the capture) and `bridge/tests/test_gt7.py` (`CaptureFileTest`: creates missing folders, a cut-short capture is readable; `ConsoleAddressTest`). The suite also runs clean with `-W error::ResourceWarning`.
 
 ---
 

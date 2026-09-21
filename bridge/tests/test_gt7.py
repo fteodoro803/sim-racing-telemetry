@@ -10,7 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from capture import capture
 from capture_file import CaptureWriter, read_capture
 from fake_console import FakeConsole, build_packet, encrypt
-from gt7 import MAGIC, NONCE_CONSTANTS, PACKET_SIZES, Decryptor, decode_a, decode_flags, heartbeat
+from gt7 import (MAGIC, NONCE_CONSTANTS, PACKET_SIZES, Decryptor, check_console_address, decode_a,
+                 decode_flags, heartbeat)
 
 
 class DecodeTest(unittest.TestCase):
@@ -77,7 +78,58 @@ class DecryptTest(unittest.TestCase):
         self.assertEqual(PACKET_SIZES, {"A": 296, "B": 316, "~": 344, "C": 368})
 
 
+class ConsoleAddressTest(unittest.TestCase):
+    def test_accepts_ip_addresses(self):
+        for ok in ("192.168.0.42", "10.0.0.5", "127.0.0.1", "255.255.255.255"):
+            self.assertEqual(check_console_address(ok), ok)
+
+    def test_rejects_placeholders_and_typos_with_a_helpful_message(self):
+        for bad in ("YOUR-PS4-IP", "", "192.168.1", "192.168.1.999", "ps4.local", "192.168.1.20 "):
+            with self.assertRaises(ValueError) as caught:
+                check_console_address(bad)
+            self.assertIn("View Connection Status", str(caught.exception))
+
+
 class CaptureFileTest(unittest.TestCase):
+    def test_creates_missing_folders_for_the_capture(self):
+        base = tempfile.mkdtemp()
+        for name in ("a/b/session.jsonl", "c/session.jsonl.gz"):
+            path = os.path.join(base, name)                        # the folders don't exist yet
+            with CaptureWriter(path, console="1.2.3.4", packet_type="A") as w:
+                w.write(0.0, b"\x01\x02")
+            self.assertEqual(read_capture(path)[1], [(0.0, b"\x01\x02")])
+
+    def test_a_capture_cut_short_still_yields_its_packets(self):
+        packets = [encrypt(build_packet(t=i / 60, packet_id=i), seed=i) for i in range(200)]
+        for name in ("cut.jsonl.gz", "cut.jsonl"):
+            path = os.path.join(tempfile.mkdtemp(), name)
+            with CaptureWriter(path, console="1.2.3.4", packet_type="A") as w:
+                for i, p in enumerate(packets):
+                    w.write(i / 60, p)
+            whole = Path(path).read_bytes()
+            Path(path).write_bytes(whole[: len(whole) * 2 // 3])      # as if the process was killed mid-write
+            header, read = read_capture(path)
+            self.assertTrue(header.get("truncated"))
+            self.assertGreater(len(read), 20)
+            self.assertLess(len(read), 200)
+            self.assertEqual([p for _, p in read], packets[: len(read)])   # what survived is intact
+
+    def test_a_complete_capture_is_not_marked_truncated(self):
+        path = os.path.join(tempfile.mkdtemp(), "ok.jsonl.gz")
+        with CaptureWriter(path, console="1.2.3.4", packet_type="A") as w:
+            w.write(0.0, b"\x01")
+        self.assertNotIn("truncated", read_capture(path)[0])
+
+    def test_a_bare_filename_needs_no_folder(self):
+        cwd = os.getcwd()
+        os.chdir(tempfile.mkdtemp())
+        try:
+            with CaptureWriter("plain.jsonl", console="1.2.3.4", packet_type="A"):
+                pass
+            self.assertTrue(os.path.exists("plain.jsonl"))
+        finally:
+            os.chdir(cwd)
+
     def test_round_trip_plain_and_gzip(self):
         packets = [encrypt(build_packet(t=i / 60, packet_id=i), seed=i) for i in range(5)]
         for name in ("session.jsonl", "session.jsonl.gz"):
