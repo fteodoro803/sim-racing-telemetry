@@ -14,6 +14,7 @@ const PROJECT_AHEAD_M = 150;   // how far ahead of the last position we look for
 const PROJECT_BACK_M = 15;     // how far behind we still look, to tolerate small backwards jitter
 const LOST_DISTANCE_M = 80;    // further than this from the line: hold progress, don't guess
 const MAX_CROSSING_GAP_M = 100; // a frame further than this from the line can't be used to place the crossing
+const LAP_TIME_TOLERANCE_MS = 1500; // a game-reported lap time this far from our own estimate isn't trusted
 
 export const DEFAULT_SPLITS = [1 / 3, 2 / 3];
 
@@ -119,6 +120,7 @@ export class LapTracker {
     this.clockOffset = 0;
     this.gapStart = null;
     this.hold = null;
+    this._seenLastLap = null;
     this._clearSession();
   }
 
@@ -310,12 +312,14 @@ export class LapTracker {
     if (this.cur && (f.lap < this.cur.n || f.t < this.prev.t)) this._clearSession();
 
     // 4. Open the first lap, or close the one that just ended when the lap counter changes
+    const staleLastLap = f.lastLap > 0 && f.lastLap === this._seenLastLap;
     if (!this.cur) {
       // Joined mid-lap: we don't know where this lap started, so it can't be timed.
       this._openLap(f.lap, false, f.t, f);
     } else if (f.lap !== this.cur.n) {
-      this._closeLap(f);
+      this._closeLap(f, staleLastLap);
     }
+    if (f.lastLap > 0) this._seenLastLap = f.lastLap;
 
     // 5. Record a sample for the lap in progress
     if (this.cur.recording) this._addSample(f, f.t - this.cur.startT);
@@ -382,8 +386,12 @@ export class LapTracker {
    *
    * The game only tells us the counter changed, so the crossing moment is estimated to
    * sub-frame accuracy from how far each side of the line the two frames were.
+   *
+   * The game's own lap time is preferred, but only if it looks freshly updated: if the game changes
+   * its lap counter a frame before its last-lap time, that value is still the previous lap's, so it
+   * is ignored (`stale`) in favour of our estimate. It is also ignored if it is far from our estimate.
    */
-  _closeLap(f) {
+  _closeLap(f, stale = false) {
     const cur = this.cur, prev = this.prev;
     let tc = f.t, xf = f;   // moment the car crossed the line, and the state at that moment
 
@@ -398,9 +406,10 @@ export class LapTracker {
           xf = lerpFrame(prev, f, frac);
         }
       }
-      // 2. Store the lap that just ended; the game's own lap time wins when it gives one
-      const timeMs = f.lastLap > 0 ? f.lastLap : tc - cur.startT;
-      this._finishLap(cur, xf, timeMs);
+      // 2. Store the lap that just ended; the game's own lap time wins when it is fresh and plausible
+      const estimate = tc - cur.startT;
+      const trusted = f.lastLap > 0 && !stale && Math.abs(f.lastLap - estimate) <= LAP_TIME_TOLERANCE_MS;
+      this._finishLap(cur, xf, trusted ? f.lastLap : estimate);
     }
 
     // 3. Open the next lap, starting at the crossing

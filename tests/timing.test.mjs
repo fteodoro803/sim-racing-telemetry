@@ -247,3 +247,37 @@ test('demo frames carry gear, suggested gear and the rev markers', () => {
   assert.ok(frames.some((f) => f.suggestedGear > f.gear));
   assert.ok(frames.filter((f) => f.suggestedGear > f.gear).every((f) => f.rpm > f.rpmWarning));
 });
+
+// ---- a stale or implausible game lap time ---------------------------------------------------
+
+test('a lap time the game has not yet updated is ignored in favour of our own estimate', () => {
+  // Move each lap's reported time one frame late, so at the lap change it still holds the previous lap's.
+  const frames = cleanFrames();
+  const real = new Map();                       // frame index -> the true time for the lap that ended there
+  frames.forEach((f, i) => { if (f.lastLap !== undefined) real.set(i, f.lastLap); });
+  let previous;
+  for (const [i, time] of real) {
+    frames[i] = { ...frames[i], lastLap: previous };     // stale at the lap change (undefined for the first)
+    if (i + 1 < frames.length) frames[i + 1] = { ...frames[i + 1], lastLap: time };
+    previous = time;
+  }
+  const tr = run(frames);
+  const truth = [...real.values()];
+  assert.equal(tr.laps.length, truth.length);
+  tr.laps.forEach((lap, i) => {
+    assert.ok(Math.abs(lap.timeMs - truth[i]) < 120, `lap ${lap.id}: ${lap.timeMs} vs true ${truth[i]}`);
+  });
+  // Without the guard, later laps would carry the previous lap's exact time.
+  const exactPrevious = tr.laps.filter((lap, i) => i > 0 && lap.timeMs === truth[i - 1]);
+  assert.equal(exactPrevious.length, 0);
+});
+
+test('a game lap time far from our own estimate is not trusted', () => {
+  const frames = cleanFrames();
+  const at = frames.findIndex((f, i) => f.lastLap !== undefined && i > 2000);   // a later lap change
+  const truth = frames[at].lastLap;
+  frames[at] = { ...frames[at], lastLap: truth + 10000 };                       // absurd: 10 s off
+  const tr = run(frames);
+  const lap = tr.laps.find((l) => l.n === frames[at].lap - 1);
+  assert.ok(Math.abs(lap.timeMs - truth) < 120, `${lap.timeMs} vs ${truth}`);
+});
