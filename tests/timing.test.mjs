@@ -1,0 +1,233 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { LapTracker, timeAt, sectorTimes } from '../web/timing.js';
+import { DemoSource } from '../web/demo-source.js';
+import { fmtLap, fmtSector, fmtDelta } from '../web/format.js';
+
+const data = JSON.parse(readFileSync(new URL('../web/demo-laps.json', import.meta.url)));
+
+/** Feed the whole demo session through a tracker and return it. */
+function runDemo(tracker = new LapTracker()) {
+  const src = new DemoSource(data);
+  while (!src.done) tracker.ingest(src.frame(src.index++));
+  return tracker;
+}
+
+// Lap times the game would report: lastLapAt holds each completed lap's time.
+const expectedLapTimes = Object.values(data.lastLapAt);
+
+test('the out-lap is skipped and every full lap is timed with the game-reported time', () => {
+  const tr = runDemo();
+  assert.deepEqual(tr.laps.map((l) => l.timeMs), expectedLapTimes);
+  assert.equal(tr.laps.length, expectedLapTimes.length);
+});
+
+test('reference length matches the track and progress is monotonic on every lap', () => {
+  const tr = runDemo();
+  assert.ok(Math.abs(tr.ref.length - 3032) < 40, `ref length ${tr.ref.length}`);
+  for (const lap of tr.laps) {
+    assert.equal(lap.p[0], 0);
+    assert.equal(lap.p[lap.p.length - 1], tr.ref.length);
+    for (let i = 1; i < lap.p.length; i++) assert.ok(lap.p[i] >= lap.p[i - 1], `lap ${lap.id} sample ${i}`);
+    for (let i = 1; i < lap.t.length; i++) assert.ok(lap.t[i] >= lap.t[i - 1], `lap ${lap.id} t sample ${i}`);
+  }
+});
+
+test('sector times add up to the lap time for any splits', () => {
+  const tr = runDemo();
+  for (const splits of [[1 / 3, 2 / 3], [0.5], [0.1, 0.4, 0.55, 0.9]]) {
+    tr.setSplits(splits);
+    for (const lap of tr.laps) {
+      const secs = tr.lapSectors(lap);
+      assert.equal(secs.length, splits.length + 1);
+      assert.ok(secs.every((s) => s > 0));
+      assert.ok(Math.abs(secs.reduce((a, b) => a + b, 0) - lap.timeMs) < 1e-6);
+    }
+  }
+});
+
+test('sector times are consistent between laps (each lap crosses the same line)', () => {
+  const tr = runDemo();
+  const secs = tr.laps.map((l) => tr.lapSectors(l));
+  // Laps differ by at most ~0.5 s in this data, so no sector should differ wildly.
+  for (let s = 0; s < 3; s++) {
+    const col = secs.map((r) => r[s]);
+    assert.ok(Math.max(...col) - Math.min(...col) < 600, `sector ${s + 1} spread ${Math.max(...col) - Math.min(...col)}`);
+  }
+});
+
+test('changing splits re-derives sectors without touching laps', () => {
+  const tr = runDemo();
+  const before = tr.laps.map((l) => l.timeMs);
+  tr.setSplits([0.25, 0.5, 0.75]);
+  assert.equal(tr.sectorCount(), 4);
+  assert.equal(tr.bestSectors().times.length, 4);
+  assert.deepEqual(tr.laps.map((l) => l.timeMs), before);
+});
+
+test('theoretical best is no slower than the best lap', () => {
+  const tr = runDemo();
+  assert.ok(tr.theoreticalBest() <= tr.bestLap.timeMs);
+});
+
+test('live delta at the end of a lap equals the lap-time difference to the comparison lap', () => {
+  const tr = new LapTracker();
+  const src = new DemoSource(data);
+  let lastLive = null, cmpAtEnd = null;
+  while (!src.done) {
+    const f = src.frame(src.index++);
+    // Just before the lap rolls over, capture the live delta and what we compare against.
+    if (f.lastLap !== undefined && tr.live?.delta !== undefined) { lastLive = tr.live; cmpAtEnd = tr.compareLap(); }
+    tr.ingest(f);
+    if (f.lastLap !== undefined && lastLive && lastLive.n === f.lap - 1 && cmpAtEnd) {
+      const lap = tr.lastLap;
+      const expected = lap.timeMs - cmpAtEnd.timeMs;
+      assert.ok(Math.abs(lastLive.delta - expected) < 60, `lap ${lap.id}: live ${lastLive.delta} vs final ${expected}`);
+      lastLive = null;
+    }
+  }
+});
+
+test('joining mid-lap: the partial first lap is not recorded', () => {
+  const tr = new LapTracker();
+  const src = new DemoSource(data);
+  src.index = data.lapStarts[2][1] + 300; // partway through lap 2
+  let seen = 0;
+  while (!src.done && tr.laps.length < 2) { tr.ingest(src.frame(src.index++)); seen++; }
+  assert.equal(tr.laps[0].n, 3);
+  assert.equal(tr.laps[0].timeMs, data.lastLapAt[data.lapStarts[4][1]]);
+});
+
+test('a lap counter going backwards resets the session', () => {
+  const tr = runDemo();
+  assert.ok(tr.laps.length > 0);
+  const src = new DemoSource(data);
+  tr.ingest(src.frame(0));
+  assert.equal(tr.laps.length, 0);
+  assert.equal(tr.ref, null);
+});
+
+test('timeAt interpolates and clamps', () => {
+  const lap = { t: [0, 1000, 2000], p: [0, 100, 300] };
+  assert.equal(timeAt(lap, 50), 500);
+  assert.equal(timeAt(lap, 200), 1500);
+  assert.equal(timeAt(lap, -5), 0);
+  assert.equal(timeAt(lap, 999), 2000);
+  assert.deepEqual(sectorTimes({ ...lap, timeMs: 2000 }, [100]), [1000, 1000]);
+});
+
+test('formatters', () => {
+  assert.equal(fmtLap(62345), '1:02.345');
+  assert.equal(fmtLap(59999.6), '1:00.000');
+  assert.equal(fmtSector(20123), '20.123');
+  assert.equal(fmtSector(5), '0.005');
+  assert.equal(fmtDelta(123), '+0.123');
+  assert.equal(fmtDelta(-1500), '−1.500');
+  assert.equal(fmtDelta(0), '±0.000');
+  assert.equal(fmtLap(null), '–:––.–––');
+});
+
+// ---- paused / loading / off-track frames --------------------------------------------------
+
+/** The demo session as an array of frames, each tagged with its original index as `_i`. */
+const cleanFrames = () => {
+  const src = new DemoSource(data);
+  return Array.from({ length: src.count }, (_, i) => ({ ...src.frame(i), _i: i }));
+};
+
+/** Feed an array of frames through a tracker and return it. */
+function run(frames, tracker = new LapTracker()) {
+  for (const f of frames) tracker.ingest(f);
+  return tracker;
+}
+
+/**
+ * Insert a stretch of flagged frames into a lap, simulating a pause, load or off-track gap.
+ *
+ * The gap starts 10 s into `lap`. It models a game that keeps sending packets while its clock
+ * stands still, so every later frame is shifted in time by the length of the gap. `junk` overrides
+ * the gap frames' values, to prove the tracker never reads them.
+ */
+function injectGap(frames, lap, flags, { count = 100, junk = {} } = {}) {
+  const at = frames.findIndex((f) => f.lap === lap) + 200;
+  const dt = data.dtMs, shift = count * dt, base = frames[at];
+  const gap = Array.from({ length: count }, (_, k) => ({ ...base, ...junk, ...flags, _i: undefined, t: base.t + (k + 1) * dt }));
+  const after = frames.slice(at + 1).map((f) => ({ ...f, t: f.t + shift }));
+  return [...frames.slice(0, at + 1), ...gap, ...after];
+}
+
+const gapCases = {
+  paused: [{ paused: true }, {}],
+  loading: [{ loading: true }, { lap: 0, x: 0, z: 0, speed: 0 }],   // junk values must never be read
+  'off track': [{ onTrack: false }, { lap: 0, x: 0, z: 0, speed: 0 }],
+};
+
+for (const [name, [flags, junk]] of Object.entries(gapCases)) {
+  test(`${name} frames are dropped and the interrupted lap is marked invalid`, () => {
+    const clean = run(cleanFrames());
+    const tr = run(injectGap(cleanFrames(), 4, flags, { junk }));
+
+    assert.equal(tr.laps.length, clean.laps.length);
+    assert.deepEqual(tr.laps.map((l) => l.valid), clean.laps.map((_, i) => i !== 3));
+    assert.deepEqual(tr.laps.map((l) => l.timeMs), clean.laps.map((l) => l.timeMs));
+    // Laps that weren't interrupted come out identical to a clean run.
+    for (const i of [0, 1, 2, 4, 5, 6, 7]) {
+      tr.lapSectors(tr.laps[i]).forEach((s, k) => assert.ok(Math.abs(s - clean.lapSectors(clean.laps[i])[k]) < 1e-6));
+    }
+  });
+}
+
+test('the clock stands still during a pause, so live elapsed time matches a clean run', () => {
+  const frames = cleanFrames();
+  const clean = new LapTracker(), elapsedAt = [];
+  for (const f of frames) { clean.ingest(f); elapsedAt[f._i] = clean.live?.elapsed; }
+
+  const tr = new LapTracker();
+  let compared = 0;
+  for (const f of injectGap(cleanFrames(), 4, { paused: true })) {
+    tr.ingest(f);
+    if (f._i !== undefined && tr.live?.recording) {
+      assert.ok(Math.abs(tr.live.elapsed - elapsedAt[f._i]) < 1e-6, `frame ${f._i}`);
+      compared++;
+    }
+  }
+  assert.ok(compared > 5000);
+});
+
+test('an interrupted lap never becomes the best lap, even when it is the fastest', () => {
+  const tr = run(injectGap(cleanFrames(), 6, { paused: true }));   // lap 6 is the fastest in the data
+  assert.equal(tr.laps[5].valid, false);
+  assert.equal(tr.bestLap.n, 7);
+  assert.ok(tr.bestSectors().laps.every((l) => l.valid));
+  assert.ok(tr.theoreticalBest() <= tr.bestLap.timeMs);
+});
+
+test('comparing to "last lap" skips an interrupted lap', () => {
+  const tr = run(injectGap(cleanFrames(), 4, { paused: true })
+    .filter((f) => f.lap <= 5), new LapTracker({ compareMode: 'last' }));
+  // Stopped right after lap 4 was recorded (invalid): the lap to compare against is lap 3.
+  assert.equal(tr.lastLap.n, 4);
+  assert.equal(tr.lastValidLap.n, 3);
+  assert.equal(tr.compareLap().n, 3);
+});
+
+test('an interrupted first lap cannot become the reference lap', () => {
+  const clean = run(cleanFrames());
+  const tr = run(injectGap(cleanFrames(), 1, { paused: true }));
+  assert.equal(tr.laps.length, clean.laps.length - 1);
+  assert.equal(tr.laps[0].n, 2);
+  assert.ok(tr.ref);
+  assert.ok(tr.laps.every((l) => l.valid));
+});
+
+test('hold reports why timing is paused, and clears on resume', () => {
+  const tr = new LapTracker();
+  const frames = cleanFrames();
+  frames.slice(0, 300).forEach((f) => tr.ingest(f));
+  assert.equal(tr.hold, null);
+  tr.ingest({ ...frames[300], paused: true });
+  assert.equal(tr.hold, 'paused');
+  tr.ingest({ ...frames[301], t: frames[300].t + 1000 });
+  assert.equal(tr.hold, null);
+});

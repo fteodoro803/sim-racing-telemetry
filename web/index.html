@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sim Racing Telemetry</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <!-- ===== Title bar ===== -->
+  <header>
+    <a class="back" href="../">← Back to Lab</a>
+    <h1>Sim Racing Telemetry</h1>
+    <span class="badge" id="sourceBadge">Demo · simulated data</span>
+  </header>
+
+  <!-- ===== Playback and comparison controls ===== -->
+  <div class="controls">
+    <button id="playBtn" type="button">Pause</button>
+    <button id="restartBtn" type="button">Restart</button>
+    <label>Speed
+      <select id="speedSel">
+        <option value="1">1×</option>
+        <option value="2">2×</option>
+        <option value="5" selected>5×</option>
+        <option value="10">10×</option>
+      </select>
+    </label>
+    <label>Compare to
+      <select id="compareSel">
+        <option value="best" selected>Best lap</option>
+        <option value="last">Last lap</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- ===== Status line ===== -->
+  <p class="status" id="status" aria-live="polite"></p>
+
+  <!-- ===== Lap readouts ===== -->
+  <section class="grid readouts" aria-label="Lap readouts">
+    <div class="panel"><div class="label">Current lap</div><div class="value big" id="curTime">–:––.–––</div><div class="small" id="curSub">&nbsp;</div></div>
+    <div class="panel"><div class="label">Delta</div><div class="value big" id="delta">±–.–––</div><div class="small" id="deltaSub">&nbsp;</div></div>
+    <div class="panel"><div class="label">Predicted</div><div class="value" id="predicted">–:––.–––</div></div>
+    <div class="panel"><div class="label">Last lap</div><div class="value" id="lastLap">–:––.–––</div><div class="small" id="lastSub">&nbsp;</div></div>
+    <div class="panel"><div class="label">Best lap</div><div class="value best" id="bestLap">–:––.–––</div><div class="small" id="bestSub">&nbsp;</div></div>
+  </section>
+
+  <!-- ===== Sector cards (filled in by app.js) ===== -->
+  <section class="grid sectors" id="sectors" aria-label="Sectors"></section>
+
+  <!-- ===== Speed and delta charts ===== -->
+  <section class="grid charts">
+    <div class="panel">
+      <div class="chart-title">
+        <span class="label">Speed (km/h) over the lap</span>
+        <span class="legend"><span><i style="border-color:var(--accent)"></i>This lap</span><span><i style="border-color:var(--reference)"></i><span id="refName">Best lap</span></span></span>
+      </div>
+      <canvas id="speedChart" role="img" aria-label="Speed against distance for the current and comparison lap"></canvas>
+    </div>
+    <div class="panel">
+      <div class="chart-title">
+        <span class="label">Delta (s) over the lap</span>
+        <span class="legend">above zero = slower</span>
+      </div>
+      <canvas id="deltaChart" role="img" aria-label="Time delta against distance"></canvas>
+    </div>
+  </section>
+
+  <!-- ===== Lap table ===== -->
+  <section class="panel">
+    <div class="label" style="margin-bottom:6px">Laps</div>
+    <div class="table-wrap">
+      <table>
+        <thead id="lapHead"></thead>
+        <tbody id="lapBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="lapEmpty">No completed laps yet.</div>
+  </section>
+
+  <!-- ===== Footer note ===== -->
+  <footer>
+    <p>This is a demo running on simulated laps. To see your own laps, a small local
+    bridge program relays your game's UDP telemetry to this page (coming soon).</p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
