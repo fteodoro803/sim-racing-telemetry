@@ -72,14 +72,14 @@ Not confirmed by that implementation but in the parser docs: `totalLaps` (probab
 | `speed` | float, m/s | Convert to km/h | v1 (in the frame) |
 | `throttle` | uint8, 0–255 | Scale to 0–100 | v1 (in the frame) |
 | `brake` | uint8, 0–255 | Scale to 0–100 | v1 (in the frame) |
-| `clutch` | float, 0–1 | | v1 |
+| `clutch` | float, 0–1 | | later |
 | `clutchEngagement` | float, 0–1 | | later |
 | `gears` | uint8 | Low 4 bits: current gear. High 4 bits: suggested gear (15 means none) | v1 (current gear in the frame; suggested gear v1) |
 | `engineRPM` | float, rpm | | v1 (in the frame) |
 | `minAlertRPM`, `maxAlertRPM` | uint16, rpm | gt7dashboard calls them the rev warning and the rev limiter. Where the game's shift alert shows | v1 |
-| `boost` | float | Offset by 1: 1.0 is 0 kPa, 2.0 is 100 kPa. Only meaningful for turbo cars | v1 |
-| `wheelRotation` (B) / `wheelSteeringAngle[2]` (C) | float, radians | Steering angle. `C` gives the two front wheels | v1 |
-| flags: handbrake, TCS active, ASM active, in gear, rev-limit alert, has turbo | bits | See Flags below | v1 |
+| `boost` | float | Offset by 1: 1.0 is 0 kPa, 2.0 is 100 kPa. Only meaningful for turbo cars | no (not wanted, [D19](DECISIONS.md)) |
+| `wheelRotation` (B) / `wheelSteeringAngle[2]` (C) | float, radians | Steering angle. `C` gives the two front wheels | later, its own session ([D19](DECISIONS.md)) |
+| flags: handbrake, TCS active, ASM active, in gear, rev-limit alert, has turbo | bits | See Flags below | no (not wanted, [D19](DECISIONS.md)) |
 | `calcMaxSpeed` | int16 | Top speed in the current gearing (units unconfirmed) | later |
 | `gearRatios[8]`, `transmissionTopSpeed`, `RPMFromClutchToGearbox` | float | Gearbox detail | later |
 | `throttleFiltered`, `brakeFiltered` (`~`) | uint8 | Filtered pedals | no |
@@ -141,15 +141,15 @@ A 16-bit field. Bits 0–2 also drive the interrupted-lap handling ([D7](DECISIO
 | 0 | Car on track | v1 (`onTrack`) |
 | 1 | Paused | v1 (`paused`) |
 | 2 | Loading / processing | v1 (`loading`) |
-| 3 | In gear | v1 |
-| 4 | Has turbo | v1 |
-| 5 | Rev-limit alert | v1 |
-| 6 | Handbrake active | v1 |
+| 3 | In gear | no |
+| 4 | Has turbo | no |
+| 5 | Rev-limit alert | no |
+| 6 | Handbrake active | no |
 | 7 | Lights active | no |
 | 8 | High beams | no |
 | 9 | Low beams | no |
-| 10 | ASM active | v1 |
-| 11 | TCS active | v1 |
+| 10 | ASM active | no |
+| 11 | TCS active | no |
 
 ## What GT7 does not provide
 

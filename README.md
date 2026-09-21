@@ -1,41 +1,71 @@
 # sim-racing-telemetry
 
-A web page that shows live racing-game telemetry: lap and sector times, deltas against your best
-or last lap, and a live speed trace. Built for Gran Turismo 7 first; other games later.
+A dashboard that shows live racing-game telemetry: lap and sector times, deltas against your best
+or last lap, speed, gear, rpm and pedals. Built for Gran Turismo 7 first, and for an iPad in landscape
+beside the sim; other games later.
 
-Status: **web page and demo mode are working. The bridge (real game data) is not written yet.**
+Status: **the demo, the bridge and the live dashboard all work end to end against a fake console.
+It has not yet been run against a real PS4 or an iPad.**
 Known issues and open questions live in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) and [DECISIONS.md](DECISIONS.md); features and their status in [FEATURE_MAP.md](FEATURE_MAP.md).
 
 ## How it fits together
 
 ```
-Console/PC --UDP--> bridge --WebSocket--> web page
+PS4 --UDP--> bridge --WebSocket--> dashboard page (in a browser, on any device on your network)
 ```
 
-Browsers can't receive UDP, so a small local bridge decodes the game's packets and forwards
-them over a WebSocket to `ws://localhost:<port>`. The page also has a demo mode that replays
-simulated laps, so it works with no game and no bridge.
+Browsers can't receive UDP, so a small program, the bridge, runs on a computer on your network. It
+asks the console for telemetry, decodes each packet into a frame, and streams the frames to the page
+over a WebSocket. It also serves the page itself over http, so an iPad on the same Wi-Fi opens
+`http://<computer's address>:8765`. (A page hosted on https can't connect to a bridge on another
+device, which is why the bridge serves the page.) The page also has a demo mode that replays
+simulated laps, so the portfolio-hosted copy works with no game and no bridge.
 
 ## Layout
 
 ```
-web/      published to the portfolio: index.html, app.js, timing.js, charts.js, ...
-bridge/   NOT published: the local UDP -> WebSocket program (not written yet)
+web/      published to the portfolio, and served by the bridge: the dashboard
+bridge/   NOT published: the program that talks to the console (Python, standard library only)
+design/   the dashboard wireframes (open the .dc.html files in a browser)
 tools/    dev scripts, e.g. make_demo.py
-tests/    node --test tests/
+tests/    node --test tests/  (the web side)
 ```
 
 `web/` is plain static files with relative paths and no build step, so it can be served from
-`/lab/<id>/`. Only `web/` is published.
+`/lab/<id>/`. Only `web/` is published. Its main pieces: `layout.js` (the 12×8 grid and where each
+widget sits), `widgets.js` (one definition per widget), `timing.js` (the lap tracker), the two data
+sources `demo-source.js` and `live-source.js`, and `app.js`, which wires them together.
 
 ## Run it
 
+To see the demo, serve the page and open http://localhost:8000:
+
 ```bash
-npm run serve        # python3 -m http.server 8000 -d web, then open http://localhost:8000
+npm run serve
+```
+
+To try the whole live path with no console (a built-in fake console sends made-up data):
+
+```bash
+python3 bridge/bridge.py --fake-console
+```
+
+To use a real PS4, give the bridge its IP address (Settings > Network > View Connection Status), start
+GT7, and open the address the bridge prints, on this computer or on your iPad. More in
+[bridge/README.md](bridge/README.md):
+
+```bash
+python3 bridge/bridge.py --ps4-ip 192.168.1.20
+```
+
+Tests:
+
+```bash
+npm test
 ```
 
 ```bash
-npm test             # timing logic tests, no dependencies (Node 20+)
+npm run test:bridge
 ```
 
 ```bash
@@ -56,9 +86,16 @@ Every source (demo, and each game's bridge decoder) produces the same normalised
 | `x`, `z` | m | position on the ground plane |
 | `speed` | km/h | |
 | `throttle`, `brake` | 0-100 | |
-| `gear`, `rpm` | | |
+| `gear` | int | 0 is neutral. Reverse isn't handled yet |
+| `suggestedGear` | int, optional | the gear the game suggests; equal to `gear` when there is no suggestion |
+| `rpm` | rpm | |
+| `rpmWarning`, `rpmLimiter` | rpm, optional | where the game's shift alert starts, and the limiter. Used for the rev markers |
+| `totalLaps` | int, optional | laps in the race; 0 or absent in free practice |
 | `lastLap` | ms, optional | game-reported time of the lap just completed. Used when > 0 |
 | `paused`, `loading`, `onTrack` | bool, optional | Absent means normal driving. See "Interrupted laps" below. |
+
+Over the WebSocket each frame is a JSON object with `"type": "frame"`. The bridge also sends a
+`hello` on connect and a `status` message once a second saying whether packets are still arriving.
 
 ## Design decisions
 
@@ -74,12 +111,16 @@ Each of these is tracked, with its tradeoffs and whether it has been ratified, i
   ignored; timing starts at the next line crossing.
 - **Line crossing is placed between frames** using progress on either side, so sector times
   are accurate to well under one frame rather than quantised to the frame rate.
-  Lap time itself uses the game's `lastLap` when present.
+  Lap time itself uses the game's `lastLap` when it looks fresh and plausible; if the game hasn't yet
+  updated it, or it is far from the tracker's own estimate, the estimate is used.
 - **Interrupted laps.** Frames flagged `paused`, `loading` or `onTrack: false` are dropped, the
   timing clock skips the gap, and the lap they interrupted is marked invalid: it stays in the
   table but never counts towards best lap, best sectors, theoretical best or the "last lap"
   comparison, and can't become the reference lap. This is deliberately simple. How GT7 actually
   reports these states isn't known yet, so the rules will be revisited against real packets.
+- **The dashboard is a grid of widgets.** Each widget is a definition in `widgets.js` that builds its own
+  DOM and updates from shared state, placed by `layout.js`. That is the foundation for choosing and
+  moving widgets later; today the layout is fixed.
 - **No framework, no charting library.** Two canvas charts and a few DOM updates don't justify one.
 - **Demo data is synthetic** (made-up circuit, generated by `tools/make_demo.py`), and the page says so.
 

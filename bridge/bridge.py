@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Relay GT7 telemetry from a PlayStation to the web page, and serve the page too.
+
+    python3 bridge/bridge.py --ps4-ip 192.168.1.20
+
+It asks the console for telemetry, decodes each packet into a frame, and broadcasts the frames over
+a WebSocket. It also serves the `web/` folder over http on the same port, so a tablet on your
+network can open the page directly (a page hosted on https can't connect to a bridge on another
+device). Nothing to install: it uses only the Python standard library.
+
+To try it without a console:
+
+    python3 bridge/bridge.py --fake-console
+"""
+import argparse
+import json
+import socket
+import threading
+import time
+from pathlib import Path
+
+from capture import capture, report
+from fake_console import FakeConsole
+from frames import to_frame
+from gt7 import HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT
+from ws_server import Hub, make_server
+
+DEFAULT_WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+DEFAULT_PORT = 8765
+STATUS_EVERY_S = 1.0
+
+
+class Bridge:
+    """The running bridge: the console capture, the HTTP/WebSocket server, and the broadcast between them."""
+
+    def __init__(self, console_ip, *, packet_type="A", heartbeat_port=HEARTBEAT_PORT,
+                 telemetry_port=TELEMETRY_PORT, host="0.0.0.0", http_port=DEFAULT_PORT,
+                 web_dir=DEFAULT_WEB_DIR, record=None, say=print):
+        self.console_ip = console_ip
+        self.packet_type = packet_type
+        self.heartbeat_port = heartbeat_port
+        self.telemetry_port = telemetry_port
+        self.record = record
+        self.say = say
+        self.hub = Hub()
+        info = {"bridge": True, "game": "gt7", "packetType": packet_type}
+        hello = {"type": "hello", **info}
+        self.server = make_server(host, http_port, web_dir, self.hub, info, hello)
+        self.port = self.server.server_address[1]
+        self.stats = None
+        self._stop = threading.Event()
+        self._threads = []
+
+    def _on_decoded(self, decoded, seconds):
+        """Convert a decoded packet to a frame and broadcast it to every connected browser."""
+        frame = to_frame(decoded, seconds * 1000)
+        self.hub.broadcast_frame(json.dumps({"type": "frame", **frame}, separators=(",", ":")))
+
+    def _status_loop(self):
+        """Once a second, tell the browsers whether packets are still arriving from the console."""
+        while not self._stop.wait(STATUS_EVERY_S):
+            self.hub.broadcast(json.dumps({"type": "status", "receiving": self.hub.receiving(),
+                                           "frames": self.hub.frames}))
+
+    def _capture_loop(self):
+        self.stats = capture(
+            self.console_ip, packet_type=self.packet_type, send_port=self.heartbeat_port,
+            recv_port=self.telemetry_port, out=self.record, say=self.say,
+            on_decoded=self._on_decoded, show_values=False, stop=self._stop)
+
+    def start(self):
+        """Start serving, broadcasting and capturing in background threads."""
+        for target in (self.server.serve_forever, self._status_loop, self._capture_loop):
+            thread = threading.Thread(target=target, daemon=True)
+            thread.start()
+            self._threads.append(thread)
+        return self
+
+    def stop(self):
+        self._stop.set()
+        self.server.shutdown()
+        self.server.server_close()
+        for thread in self._threads:
+            thread.join(timeout=3)
+
+
+def lan_address():
+    """This machine's address on the local network, or None. Doesn't send any traffic."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--ps4-ip", "--console-ip", dest="ip",
+                        help="the console's IP address (PS4: Settings > Network > View Connection Status)")
+    parser.add_argument("--fake-console", action="store_true",
+                        help="use a built-in fake console instead of a real one, to try the page")
+    parser.add_argument("--type", dest="packet_type", default="A", choices=list(PACKET_SIZES),
+                        help="packet type to request (default A; only A is decoded so far)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"web port (default {DEFAULT_PORT})")
+    parser.add_argument("--host", default="0.0.0.0",
+                        help="address to serve on; 127.0.0.1 keeps it to this computer (default: all)")
+    parser.add_argument("--web-dir", type=Path, default=DEFAULT_WEB_DIR, help="folder to serve")
+    parser.add_argument("--record", help="also record raw packets to this file (.gz to compress)")
+    args = parser.parse_args(argv)
+    if not args.ip and not args.fake_console:
+        parser.error("give --ps4-ip, or --fake-console to try it without a console")
+
+    fake = None
+    ip = args.ip
+    if args.fake_console:
+        fake = FakeConsole(listen_port=HEARTBEAT_PORT, host="127.0.0.1", say=lambda msg: None)
+        fake.start()
+        ip = "127.0.0.1"
+        print("Using the built-in fake console (made-up numbers).", flush=True)
+
+    bridge = Bridge(ip, packet_type=args.packet_type, host=args.host, http_port=args.port,
+                    web_dir=args.web_dir, record=args.record)
+    bridge.start()
+    print(f"Asking {ip} for type-{args.packet_type} packets.", flush=True)
+    print(f"Open on this computer:  http://localhost:{bridge.port}", flush=True)
+    lan = lan_address()
+    if lan and args.host in ("0.0.0.0", lan):
+        print(f"Open on your iPad:      http://{lan}:{bridge.port}   (same Wi-Fi network)", flush=True)
+    print("Press Ctrl-C to stop.", flush=True)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        bridge.stop()
+        if fake:
+            fake.stop()
+        if bridge.stats:
+            report(bridge.stats, args.packet_type, args.record)
+
+
+if __name__ == "__main__":
+    main()

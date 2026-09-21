@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>body { margin: 0; background: #07070a; }</style>
+</helmet>
+
+<div style="min-height:100vh; padding:40px 24px; display:flex; flex-direction:column; align-items:center; gap:36px; font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+
+  <!-- ============================================================ A: SETUP ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>a) Setup</strong> <span style="color:#6d7481;"> — choose Demo or Live, modal over the dashboard</span></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#6d7481;"></span><span style="font-size:12px; color:#8c929d;">Not connected</span></div>
+        </div>
+      </div>
+      <div style="position:absolute; inset:48px 0 0 0; background:rgba(8,9,11,.72);"></div>
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:520px; background:#171a20; border:1px solid #2b3038; border-radius:12px; padding:28px 30px; box-shadow:0 24px 60px rgba(0,0,0,.55);">
+        <div style="color:#e8eaee; font-size:17px; font-weight:700; margin-bottom:18px;">Connect to game</div>
+        <div style="display:flex; gap:2px; background:#101216; border:1px solid #2b3038; border-radius:7px; padding:2px; width:max-content; margin-bottom:20px;">
+          <span style="font-size:13px; color:#8c929d; padding:8px 18px; border-radius:5px;">Demo</span>
+          <span style="font-size:13px; color:#0d1117; font-weight:600; background:#5aa7ff; padding:8px 18px; border-radius:5px;">Live</span>
+        </div>
+        <div style="font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:#8c929d; margin-bottom:6px;">Bridge address</div>
+        <div style="display:flex; gap:10px; margin-bottom:22px;">
+          <div style="flex:1; height:44px; border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; padding:0 12px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:14px; color:#e8eaee; background:#101216;">ws://localhost:9010</div>
+          <span style="height:44px; display:flex; align-items:center; padding:0 22px; background:#5aa7ff; color:#0d1117; font-weight:600; font-size:14px; border-radius:6px;">Connect</span>
+        </div>
+        <div style="border-top:1px solid #2b3038; padding-top:18px; display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:flex-start; gap:12px;"><span style="flex:0 0 22px; height:22px; border-radius:50%; background:#2b3038; color:#c7cbd1; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center;">1</span><span style="font-size:14px; color:#c7cbd1;">Start the bridge on your computer</span></div>
+          <div style="display:flex; align-items:flex-start; gap:12px;"><span style="flex:0 0 22px; height:22px; border-radius:50%; background:#2b3038; color:#c7cbd1; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center;">2</span><span style="font-size:14px; color:#c7cbd1;">Start GT7</span></div>
+          <div style="display:flex; align-items:flex-start; gap:12px;"><span style="flex:0 0 22px; height:22px; border-radius:50%; background:#2b3038; color:#c7cbd1; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center;">3</span><span style="font-size:14px; color:#c7cbd1;">Connect</span></div>
+        </div>
+        <div style="margin-top:20px;"><span style="font-size:13px; color:#5aa7ff;">Download the bridge →</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ B: CONNECTING ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>b) Connecting</strong></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <span style="font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#8c929d; border:1px solid #2b3038; border-radius:99px; padding:3px 9px;">LIVE</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#8c929d;"></span><span style="font-size:12px; color:#8c929d;">Connecting…</span></div>
+        </div>
+      </div>
+      <div style="margin:16px; width:1148px; height:740px; display:flex; align-items:center; justify-content:center; background-image:linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px); background-size:calc((100% + 12px)/12) calc(82px + 12px);">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:16px;">
+          <div style="font-size:15px; color:#c7cbd1;">Connecting to bridge…</div>
+          <div style="width:220px; height:4px; background:#2b3038; border-radius:2px; overflow:hidden; position:relative;">
+            <div style="position:absolute; left:0; top:0; width:70px; height:100%; background:#5aa7ff; border-radius:2px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ C: WAITING FOR GAME ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>c) Connected, waiting for game</strong></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <span style="font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#8c929d; border:1px solid #2b3038; border-radius:99px; padding:3px 9px;">LIVE</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#4cc38a;"></span><span style="font-size:12px; color:#8c929d;">Connected</span></div>
+        </div>
+      </div>
+      <div style="margin:16px; width:1148px; height:740px; display:flex; align-items:center; justify-content:center; background-image:linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px); background-size:calc((100% + 12px)/12) calc(82px + 12px);">
+        <div style="text-align:center; max-width:420px;">
+          <div style="font-size:17px; color:#c7cbd1; font-weight:600; margin-bottom:8px;">Waiting for GT7</div>
+          <div style="font-size:14px; color:#6d7481;">Start a race or time trial.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ D: LIVE AND HEALTHY ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>d) Live and healthy</strong></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <span style="font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#8c929d; border:1px solid #2b3038; border-radius:99px; padding:3px 9px;">LIVE</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#4cc38a;"></span><span style="font-size:12px; color:#8c929d;">Connected</span></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; align-items:center; gap:2px; background:#101216; border:1px solid #2b3038; border-radius:7px; padding:2px;">
+            <span style="font-size:12px; color:#8c929d; padding:6px 12px; border-radius:5px;">Timing</span>
+            <span style="font-size:12px; color:#8c929d; padding:6px 12px; border-radius:5px;">Driving</span>
+            <span style="font-size:12px; color:#0d1117; font-weight:600; background:#5aa7ff; padding:6px 12px; border-radius:5px;">Everything</span>
+            <span style="font-size:12px; color:#8c929d; padding:6px 12px; border-radius:5px;">Custom</span>
+          </div>
+          <span style="font-size:12px; color:#c7cbd1; border:1px solid #2b3038; border-radius:6px; padding:7px 14px;">Edit</span>
+        </div>
+      </div>
+      <div style="margin:16px; width:1148px; height:740px; display:grid; grid-template-columns:repeat(12,1fr); grid-template-rows:repeat(8,82px); gap:12px; background-image:linear-gradient(to right, rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.055) 1px, transparent 1px); background-size:calc((100% + 12px)/12) calc(82px + 12px);">
+        <div style="grid-column:1/4; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Current Lap</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#5aa7ff;">1:24.512</div></div>
+        <div style="grid-column:4/7; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Delta</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#4cc38a;">−0.153</div></div>
+        <div style="grid-column:1/7; grid-row:3/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:10px 14px; display:flex; gap:14px;">
+          <div style="flex:1; margin-top:16px; border-left:3px solid #3a414c; padding-left:10px;"><div style="font-size:10px; color:#6d7481;">S1</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:20px; color:#e8eaee;">24.510</div></div>
+          <div style="flex:1; margin-top:16px; border-left:3px solid #5aa7ff; padding-left:10px;"><div style="font-size:10px; color:#5aa7ff;">S2</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:20px; color:#5aa7ff;">27.891</div></div>
+          <div style="flex:1; margin-top:16px; border-left:3px solid #2b3038; padding-left:10px;"><div style="font-size:10px; color:#6d7481;">S3</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:20px; color:#4a505a;">––.–––</div></div>
+        </div>
+        <div style="grid-column:7/13; grid-row:1/2; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:0 16px; display:flex; align-items:center; gap:16px;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">RPM</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:22px; font-weight:600; color:#5aa7ff;">7420</div></div>
+        <div style="grid-column:7/9; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#5aa7ff;">4</div></div>
+        <div style="grid-column:9/13; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:8px;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#5aa7ff;">226</div><div style="font-size:14px; color:#8c929d;">km/h</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ E: TIMING HELD ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>e) Timing held (paused)</strong></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <span style="font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#8c929d; border:1px solid #2b3038; border-radius:99px; padding:3px 9px;">LIVE</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#4cc38a;"></span><span style="font-size:12px; color:#8c929d;">Connected</span></div>
+        </div>
+      </div>
+      <div style="margin:16px 16px 0; height:40px; background:rgba(140,146,157,.12); border:1px solid #3a414c; border-radius:6px; display:flex; align-items:center; padding:0 16px; gap:10px;">
+        <span style="width:14px; height:14px; border-radius:3px; background:#5b6472; display:inline-block;"></span>
+        <span style="font-size:13px; color:#c7cbd1;">Timing held (paused). This lap won't count towards best times.</span>
+      </div>
+      <div style="margin:12px 16px 16px; width:1148px; height:684px; display:grid; grid-template-columns:repeat(12,1fr); grid-template-rows:repeat(7,82px); gap:12px; background-image:linear-gradient(to right, rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.055) 1px, transparent 1px); background-size:calc((100% + 12px)/12) calc(82px + 12px);">
+        <div style="grid-column:1/4; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Current Lap</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#5b6472;">1:24.512</div><div style="font-size:11px; color:#6d7481; margin-top:2px;">not counted</div></div>
+        <div style="grid-column:4/7; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Delta</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#5b6472;">−0.153</div></div>
+        <div style="grid-column:7/13; grid-row:1/2; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:0 16px; display:flex; align-items:center; gap:16px;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">RPM</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:22px; font-weight:600; color:#5aa7ff;">0</div></div>
+        <div style="grid-column:7/9; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#5aa7ff;">N</div></div>
+        <div style="grid-column:9/13; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:8px;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#5aa7ff;">0</div><div style="font-size:14px; color:#8c929d;">km/h</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ F: CONNECTION LOST ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="width:1180px; color:#e8eaee; font-size:14px;"><strong>f) Connection lost</strong></div>
+    <div style="width:1180px; height:820px; background:#101216; border-radius:18px; overflow:hidden; box-shadow:0 0 0 1px #2b3038, 0 30px 80px rgba(0,0,0,.6); position:relative;">
+      <div style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#171a20; border-bottom:1px solid #2b3038;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span style="color:#e8eaee; font-size:14px; font-weight:700; letter-spacing:.03em;">TELEMETRY</span>
+          <span style="font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#8c929d; border:1px solid #2b3038; border-radius:99px; padding:3px 9px;">LIVE</span>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#ff6b6b;"></span><span style="font-size:12px; color:#ff6b6b;">Disconnected</span></div>
+        </div>
+      </div>
+      <div style="margin:16px 16px 0; height:40px; background:rgba(255,107,107,.1); border:1px solid #6b3a3a; border-radius:6px; display:flex; align-items:center; padding:0 16px; gap:10px;">
+        <span style="width:14px; height:14px; border-radius:3px; background:#ff6b6b; display:inline-block;"></span>
+        <span style="font-size:13px; color:#ff9b9b;">Lost connection. Retrying…</span>
+      </div>
+      <div style="margin:12px 16px 16px; width:1148px; height:684px; display:grid; grid-template-columns:repeat(12,1fr); grid-template-rows:repeat(7,82px); gap:12px; opacity:.4; background-image:linear-gradient(to right, rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.055) 1px, transparent 1px); background-size:calc((100% + 12px)/12) calc(82px + 12px);">
+        <div style="grid-column:1/4; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Current Lap</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#8c929d;">1:24.512</div></div>
+        <div style="grid-column:4/7; grid-row:1/3; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">Delta</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:34px; font-weight:600; color:#8c929d;">−0.153</div></div>
+        <div style="grid-column:7/13; grid-row:1/2; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:0 16px; display:flex; align-items:center; gap:16px;"><div style="font-size:11px; text-transform:uppercase; color:#8c929d;">RPM</div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:22px; font-weight:600; color:#8c929d;">7420</div></div>
+        <div style="grid-column:7/9; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#8c929d;">4</div></div>
+        <div style="grid-column:9/13; grid-row:2/5; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:8px;"><div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:60px; font-weight:700; color:#8c929d;">226</div><div style="font-size:14px; color:#6d7481;">km/h</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ WIDGET NO-DATA STATE ============================================================ -->
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="color:#e8eaee; font-size:14px;"><strong>Widget no-data state</strong> <span style="color:#6d7481;"> — e.g. before the first lap completes</span></div>
+    <div style="width:281px; height:176px; position:relative; background:rgba(23,26,32,.97); border:1px solid #2b3038; border-radius:6px; padding:12px 14px; display:flex; flex-direction:column; justify-content:center;">
+      <span style="position:absolute; top:6px; right:8px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10px; color:#6d7481; background:rgba(0,0,0,.35); padding:2px 6px; border-radius:3px;">3×2</span>
+      <div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#8c929d; margin-bottom:6px;">Delta</div>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; font-size:42px; font-weight:600; color:#4a505a; line-height:1;">—</div>
+      <div style="font-size:11px; color:#6d7481; margin-top:4px;">no data</div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>
