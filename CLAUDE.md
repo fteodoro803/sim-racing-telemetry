@@ -37,6 +37,8 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 
 **Bridge:** Python, one decoder module per game (D15). Keep the first slice standard-library only; anything added goes in `bridge/requirements.txt`. Decoders are pure functions from bytes to frames, so they can be tested from recorded packets without a console.
 
+**Dashboard elements are widgets.** A new panel is a definition in `web/widgets.js` (`build` once, `update` from the shared context, optional `onTap`) placed by `web/layout.js`; widgets read only the context they are given, never the data source or each other. Size everything in the `--u` unit so it scales with the screen. See `DASHBOARD_PLAN.md`.
+
 **Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
 
 **Demo data is synthetic** and must stay labelled as such on the page. Regenerate `web/demo-laps.json` with `npm run demo-data`; commit the result.

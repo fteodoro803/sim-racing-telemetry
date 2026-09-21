@@ -16,7 +16,15 @@ Tracks what's actually been built, in order, as this plan is implemented.
 
 **Scope of the first pass:** the "Everything" layout as a fixed grid, with the Timing widgets plus speed, gear, rpm and pedals; frames extended to carry those channels; the bridge forwarding frames over a WebSocket and serving `web/`; a live source with the setup panel and connection states. **Not in it:** presets switching, edit mode and the Custom layout, steering (its own session), driver aids and boost (not wanted, [D19](DECISIONS.md)), tyres, fuel, track map, the Review view, the phone layout.
 
-**Status:** in progress. Wireframes received, reviewed and committed; build steps 1–5 under way.
+**Status:** steps 1–5 complete; step 6 (the real PS4 and iPad) pending. `npm test` (30) and `npm run test:bridge` (32) pass, and the whole path was checked in a browser against the fake console.
+
+1. **Frame format and demo data** (step 1). Added `suggestedGear`, `rpmWarning`, `rpmLimiter` and `totalLaps` (optional) to the frame format, the demo generator and `DemoSource`; documented in the README. The generator now compares the stored (rounded) rpm against the warning level, after a test caught them disagreeing.
+2. **Bridge** (step 2). `bridge/bridge.py` runs the console capture, converts each packet to a frame (`frames.py`), and broadcasts it over a WebSocket. `ws_server.py` is a standard-library HTTP and WebSocket server on one port: it serves `web/`, answers `/bridge.json`, and upgrades `/ws`. `--fake-console` tries the whole path with no PS4. Diverged from the plan: the WebSocket server is hand-written rather than a `websockets` dependency, so the bridge still needs nothing installed.
+3. **Live source** (step 3). `web/live-source.js`: a WebSocket client with connecting, waiting, live and lost states and a backoff reconnect; unit-tested with a fake socket. The setup panel and the connection states are in `app.js`.
+4. **Dashboard** (step 4). `web/layout.js`, `web/widgets.js`, `web/dom.js` and a rewritten `index.html`, `style.css` and `app.js`: the 12×8 grid of widgets from section 1, styled with section 2, scaled with one `--u` unit so it fits any screen. The delta chart draws green below zero and red above. Widgets: current lap, delta (tap to switch best/last), sectors, delta chart, last, best, predicted, lap table, rpm, gear, speed and pedals.
+5. **Checked in a browser against the fake console** (step 5), at 1180×820 and 1024×768: live values, laps and sectors accumulating; the lost-connection state (dims, reconnects by itself and starts a fresh session); the waiting-for-GT7 state; the hosted page starting in the demo and connecting to a bridge from the setup panel.
+6. **Extra robustness.** The tracker ignores a game lap time that hasn't been updated yet (the lap counter can change a frame before `last_lap`) or is far from its own estimate, falling back to its own timing. Tests fail without it.
+7. **Lap numbers.** The lap table uses the game's lap numbers, which differ from the tracker's own count when joining mid-session.
 
 ## 1. Grid and layout
 
@@ -125,7 +133,7 @@ PS4 --UDP--> bridge --WebSocket--> page (served by the bridge over http, or the 
 - `npm test` and `npm run test:bridge` pass.
 - With the fake console and the bridge running, open the served page in a browser and confirm every widget shows live values and the lap tracker produces laps.
 - At 1180×820, confirm nothing overflows and the grid matches section 1.
-- Real console (pending): run the capture tool and the full path on the PS4, then on the iPad over the local network.
+- Real console (pending, step 6): run the capture tool and the full bridge on the PS4, then open the page on the iPad over the local network. Expect to correct: byte offsets, gear encoding, the meaning of `onTrack`, and whether the game updates `last_lap` when the lap counter changes.
 
 ## Flagged open questions
 
