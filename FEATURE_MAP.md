@@ -41,7 +41,7 @@ This project has no user roles or paid tiers, so the Role and Gated-by columns a
 
 | Feature | Surface | Status | Code ref | Notes |
 |---|---|---|---|---|
-| GT7 bridge (UDP → WebSocket) | Bridge | Planned | `bridge/` (stub) | [Known issues 1–2](PROJECT_CONTEXT.md); language [O1](DECISIONS.md) |
+| GT7 bridge (UDP → WebSocket) | Bridge | Planned | `bridge/` (stub) | [Known issues 1–2](PROJECT_CONTEXT.md); language: Python ([D15](DECISIONS.md)) |
 | Live mode (WebSocket source) | Page | Planned | | Blocked by the bridge. [Known issues 3–4](PROJECT_CONTEXT.md) |
 | Track map | Page | Planned | | Own pass and plan doc. [D6](DECISIONS.md) |
 | User-defined sector splits | Page | Planned | | Placed on the track map. [D5](DECISIONS.md) |
@@ -50,3 +50,7 @@ This project has no user roles or paid tiers, so the Role and Gated-by columns a
 | Session export / import | Page | Planned | | [Known issue 8](PROJECT_CONTEXT.md) |
 | Support for other games | Bridge | Planned | | One decoder per game. [Future directions](PROJECT_CONTEXT.md) |
 | Export laps to the car log | Page | Planned | | Depends on a separate Lab entry that doesn't exist yet |
+| Customisable dashboard (choose widgets and snap them into a grid; basic presets plus a Custom layout) | Page | Planned | | [Known issue 11](PROJECT_CONTEXT.md); [D11](DECISIONS.md); library question [O13](DECISIONS.md) |
+| Tyre widget (tyre graphics that change colour with temperature, no numeric labels) | Page | Planned | | Later, on its own pass: the colour ranges need real data. [D12](DECISIONS.md) |
+| Driving widgets (speed, pedals and clutch, gear and suggested gear, rpm and rev-limit indicator, boost, steering, driver-aid indicators) | Page | Planned | | First proper version. [Known issues 12–13](PROJECT_CONTEXT.md); fields in [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
+| Fuel widget (level, consumption, laps remaining) | Page | Planned | | Later, not in the first version. Needs fuel channels in the frame format |
