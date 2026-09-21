@@ -1,0 +1,106 @@
+/* Standalone: this tool is served from /lab/<id>/ and shares nothing with the portfolio CSS. */
+:root {
+  --bg: #f6f6f4;
+  --panel: #ffffff;
+  --text: #16181c;
+  --muted: #6a6f78;
+  --line: #d6d8dc;
+  --grid: #ececef;
+  --accent: #0b6bcb;
+  --reference: #9aa0aa;
+  --good: #14804a;
+  --bad: #c62828;
+  --best: #7b3fb8;
+  --split: #b7bcc5;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101216;
+    --panel: #171a20;
+    --text: #e8eaee;
+    --muted: #8c929d;
+    --line: #2b3038;
+    --grid: #1f242b;
+    --accent: #5aa7ff;
+    --reference: #6d7481;
+    --good: #4cc38a;
+    --bad: #ff6b6b;
+    --best: #b98cf0;
+    --split: #3a414c;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1040px; margin: 0 auto; padding: 16px; }
+a { color: var(--accent); }
+
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 12px; }
+header h1 { font-size: 20px; margin: 0; font-weight: 650; }
+header .back { font-size: 14px; }
+.badge {
+  font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted);
+}
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; }
+.controls label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+button, select {
+  font: inherit; font-size: 14px; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.status { font-size: 13px; color: var(--muted); margin: 0 0 10px; min-height: 1.4em; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.grid { display: grid; gap: 10px; }
+.readouts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 10px; }
+.sectors { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 10px; }
+
+.label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.value { font-family: var(--mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.value.big { font-size: 34px; }
+.small { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.good { color: var(--good); }
+.bad { color: var(--bad); }
+.best { color: var(--best); }
+
+.sector { border-left: 3px solid var(--line); }
+.sector.current { border-left-color: var(--accent); }
+.sector.done { border-left-color: var(--muted); }
+.sector .row { display: flex; justify-content: space-between; gap: 8px; }
+
+.charts { grid-template-columns: 1fr; margin-bottom: 10px; }
+.chart-title { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.legend { font-size: 12px; color: var(--muted); display: flex; gap: 12px; }
+.legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+canvas { width: 100%; display: block; }
+#speedChart { height: 190px; }
+#deltaChart { height: 130px; }
+
+table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 12px system-ui, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+tr.live td { color: var(--accent); }
+tr.invalid td { color: var(--muted); }
+tr.invalid td[colspan] { text-align: left; font-family: system-ui, sans-serif; font-size: 13px; }
+td.best { font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+
+footer { margin-top: 14px; font-size: 13px; color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+@media (max-width: 560px) {
+  main { padding: 12px 16px; }
+  .value.big { font-size: 28px; }
+  .value { font-size: 22px; }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "sim-racing-telemetry",
+  "private": true,
+  "type": "module",
+  "description": "Racing-game telemetry visualiser. The published site is web/ only; this file exists for tests and dev scripts.",
+  "scripts": {
+    "test": "node --test tests/",
+    "demo-data": "python3 tools/make_demo.py",
+    "serve": "python3 -m http.server 8000 -d web"
+  }
+}
