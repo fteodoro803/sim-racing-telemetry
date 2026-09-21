@@ -56,7 +56,11 @@ Every source (demo, and each game's bridge decoder) produces the same normalised
 | `x`, `z` | m | position on the ground plane |
 | `speed` | km/h | |
 | `throttle`, `brake` | 0-100 | |
-| `gear`, `rpm` | | |
+| `gear` | int | 0 is neutral. Reverse isn't handled yet |
+| `suggestedGear` | int, optional | the gear the game suggests; equal to `gear` when there is no suggestion |
+| `rpm` | rpm | |
+| `rpmWarning`, `rpmLimiter` | rpm, optional | where the game's shift alert starts, and the limiter. Used for the rev markers |
+| `totalLaps` | int, optional | laps in the race; 0 or absent in free practice |
 | `lastLap` | ms, optional | game-reported time of the lap just completed. Used when > 0 |
 | `paused`, `loading`, `onTrack` | bool, optional | Absent means normal driving. See "Interrupted laps" below. |
 

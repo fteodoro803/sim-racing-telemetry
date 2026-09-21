@@ -40,7 +40,8 @@ export class DemoSource {
       lap: this.lapAt[i],
       x: d.x[i], z: d.z[i],
       speed: d.speed[i], throttle: d.throttle[i], brake: d.brake[i],
-      gear: d.gear[i], rpm: d.rpm[i],
+      gear: d.gear[i], suggestedGear: d.suggestedGear[i], rpm: d.rpm[i],
+      rpmWarning: d.rpmWarning, rpmLimiter: d.rpmLimiter,
     };
     const last = d.lastLapAt[i];
     if (last !== undefined) f.lastLap = last;

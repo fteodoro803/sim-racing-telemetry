@@ -26,6 +26,8 @@ VMAX = 88.0      # m/s, ~317 km/h
 A_LAT = 14.0     # m/s^2 cornering limit at grip 1.0
 A_BRAKE = 16.0   # m/s^2
 GEAR_UP = [0, 55, 95, 135, 175, 220, 265]  # km/h at which each gear starts
+RPM_WARNING = 7600   # the game's shift alert starts here
+RPM_LIMITER = 8200
 
 # One entry per lap: (grip in three zones, [(position 0..1, width m, speed factor)], seed)
 LAPS = [
@@ -181,7 +183,7 @@ def main():
     sims.append(dict(sims[-1]))
 
     # 4. Sample the session at a fixed frame rate, as the game would
-    cols = {k: [] for k in ("x", "z", "speed", "throttle", "brake", "gear", "rpm")}
+    cols = {k: [] for k in ("x", "z", "speed", "throttle", "brake", "gear", "suggestedGear", "rpm")}
     lap_starts, last_lap_at = [], {}
     n_frames = math.ceil(total / DT_MS) + 1
     m = 0
@@ -213,6 +215,7 @@ def main():
         cols["throttle"].append(round(s["thr"][k] * 100))
         cols["brake"].append(round(s["brk"][k] * 100))
         cols["gear"].append(gear)
+        cols["suggestedGear"].append(min(gear + 1, len(GEAR_UP)) if round(rpm / 10) * 10 > RPM_WARNING else gear)   # compare the stored (rounded) rpm
         cols["rpm"].append(round(rpm / 10) * 10)
 
     # 5. Write the columnar output
@@ -222,6 +225,8 @@ def main():
         "dtMs": DT_MS,
         "lapStarts": lap_starts,   # [lap number, first frame index]
         "lastLapAt": last_lap_at,  # frame index -> previous lap time (ms), as the game reports it
+        "rpmWarning": RPM_WARNING,
+        "rpmLimiter": RPM_LIMITER,
         **cols,
     }
     OUT.write_text(json.dumps(data, separators=(",", ":")))

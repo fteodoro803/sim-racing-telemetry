@@ -231,3 +231,19 @@ test('hold reports why timing is paused, and clears on resume', () => {
   tr.ingest({ ...frames[301], t: frames[300].t + 1000 });
   assert.equal(tr.hold, null);
 });
+
+// ---- driving channels in the frame ---------------------------------------------------------
+
+test('demo frames carry gear, suggested gear and the rev markers', () => {
+  const src = new DemoSource(data);
+  const frames = Array.from({ length: src.count }, (_, i) => src.frame(i));
+  for (const f of frames) {
+    assert.ok(Number.isInteger(f.gear) && f.gear >= 1, `gear ${f.gear}`);
+    assert.ok(Number.isInteger(f.suggestedGear) && f.suggestedGear >= f.gear, `suggested ${f.suggestedGear}`);
+    assert.equal(f.rpmWarning, 7600);
+    assert.equal(f.rpmLimiter, 8200);
+  }
+  // The suggestion only differs from the current gear when the revs are past the warning.
+  assert.ok(frames.some((f) => f.suggestedGear > f.gear));
+  assert.ok(frames.filter((f) => f.suggestedGear > f.gear).every((f) => f.rpm > f.rpmWarning));
+});
