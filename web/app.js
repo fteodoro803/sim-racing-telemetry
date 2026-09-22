@@ -6,8 +6,10 @@
 
 import { readTheme } from './charts.js';
 import { DemoSource } from './demo-source.js';
+import { currentLayout, loadState, resetActivePreset, saveAsCustom, saveState, switchPreset } from './dashboard-state.js';
 import { el, setClass, setText } from './dom.js';
-import { DEFAULT_LAYOUT } from './layout.js';
+import { buildEditChrome, wireEditMode } from './edit.js';
+import { PRESET_LAYOUTS, WIDGET_META } from './layout.js';
 import { LiveSource } from './live-source.js';
 import { clearSession, loadSession, saveSession } from './persistence.js';
 import { buildExport, downloadJson, exportFilename, readImport } from './session-file.js';
@@ -52,6 +54,9 @@ const app = {
   imported: null,            // { source, exportedAt } of an imported file, while reviewing one
   theme: readTheme(),
   widgets: [],               // { def, refs } for each widget on the grid
+  dashboard: loadState(),    // { presetId, custom } - which preset is showing, and Custom's saved layout
+  editing: false,            // edit mode: dragging, resizing, adding and removing widgets
+  draftLayout: null,         // the layout being edited, only while `editing`
 };
 
 // ---- data sources ----------------------------------------------------------
@@ -156,12 +161,21 @@ function context() {
   };
 }
 
-/** Create a card for each widget in the layout and let each build its own contents. */
-function buildGrid() {
+/**
+ * Rebuild the grid's widget cards from a layout, letting each widget build its own contents. Called
+ * whenever the layout itself changes: switching presets, entering or leaving edit mode, and every
+ * commit within it (move, resize, add, remove). Frame-by-frame updates go through `render` instead.
+ */
+function renderGrid(layout, editing) {
   const grid = $('grid');
-  for (const item of DEFAULT_LAYOUT) {
+  grid.replaceChildren(ghostEl);   // the drag/resize ghost lives in the grid too, but survives a rebuild
+  app.widgets = [];
+  for (const item of layout) {
     const def = WIDGETS[item.widget];
+    if (!def) continue;   // a saved Custom layout naming a widget that no longer exists
     const card = el('section', `widget w-${item.widget}`);
+    card.dataset.widget = item.widget;
+    card.dataset.variant = item.variant || WIDGET_META[item.widget]?.variants?.[0]?.id || '';
     card.style.gridColumn = `${item.col} / span ${item.w}`;
     card.style.gridRow = `${item.row} / span ${item.h}`;
     if (def.noLabel) card.classList.add('inline');
@@ -171,11 +185,126 @@ function buildGrid() {
     const refs = def.build(body);
     if (def.onTap) {
       card.classList.add('tappable');
-      card.addEventListener('click', () => { def.onTap(context()); render(); });
+      card.addEventListener('click', () => { if (app.editing) return; def.onTap(context()); render(); });
+    }
+    if (editing) {
+      card.classList.add('editable');
+      const { chrome, drag, remove, size, select } = buildEditChrome(item.widget, WIDGET_META[item.widget]?.variants);
+      setText(size, `${item.w}×${item.h}`);
+      card.append(chrome);
+      drag.addEventListener('pointerdown', (event) => { event.preventDefault(); editor.startMove(card, item.widget, event.pointerId); });
+      remove.addEventListener('click', () => editor.removeWidget(item.widget));
+      for (const handle of chrome.querySelectorAll('.resize-handle')) {
+        const corner = handle.classList[1];
+        handle.addEventListener('pointerdown', (event) => { event.preventDefault(); editor.startResize(card, item.widget, corner, event.pointerId); });
+      }
+      if (select) {
+        select.value = card.dataset.variant;
+        select.addEventListener('pointerdown', (event) => event.stopPropagation());
+        select.addEventListener('change', () => editor.setVariant(item.widget, select.value));
+      }
     }
     grid.append(card);
     app.widgets.push({ def, refs });
   }
+  grid.classList.toggle('editing', editing);
+  $('emptyState').hidden = !(editing && layout.length === 0);
+}
+
+// ---- presets and edit mode --------------------------------------------------
+
+const ghostEl = el('div', 'ghost');
+ghostEl.hidden = true;
+
+/** Widgets already in the palette's Timing or Driving group (every widget in the registry), grouped. */
+function paletteEntries(group) {
+  return Object.entries(WIDGET_META).filter(([, meta]) => meta.group === group);
+}
+
+function buildPaletteList(containerId, group) {
+  const list = $(containerId);
+  list.replaceChildren();
+  for (const [id, meta] of paletteEntries(group)) {
+    const item = el('button', 'palette-item');
+    item.type = 'button';
+    const swatch = el('span', 'palette-swatch');
+    const name = el('span', 'palette-name', meta.title);
+    const size = el('span', 'palette-size', `${meta.addW}×${meta.addH}`);
+    item.append(swatch, name, size);
+    const already = app.draftLayout.some((it) => it.widget === id);
+    item.disabled = already;
+    item.classList.toggle('added', already);
+    item.addEventListener('click', () => editor.addWidget(id));
+    list.append(item);
+  }
+}
+
+function renderPalette() {
+  buildPaletteList('paletteTiming', 'timing');
+  buildPaletteList('paletteDriving', 'driving');
+}
+
+const editor = wireEditMode($('grid'), {
+  ghostEl,
+  getLayout: () => app.draftLayout,
+  onChange: (next) => {
+    app.draftLayout = next;
+    renderGrid(app.draftLayout, true);
+    renderPalette();
+  },
+  onTintCollisions: (ids) => {
+    for (const card of $('grid').querySelectorAll('.widget')) card.classList.toggle('collide', ids.includes(card.dataset.widget));
+  },
+});
+
+/** Clone a preset's default layout, or Custom's saved one (blank if it has none yet). */
+function cloneOfPreset(presetId) {
+  return (presetId === 'custom' ? (app.dashboard.custom || []) : PRESET_LAYOUTS[presetId]).map((it) => ({ ...it }));
+}
+
+function selectPreset(presetId) {
+  if (app.editing) return;
+  app.dashboard = switchPreset(app.dashboard, presetId);
+  saveState(localStorage, app.dashboard);
+  renderGrid(currentLayout(app.dashboard), false);
+  renderChrome();
+}
+
+function enterEditMode() {
+  app.draftLayout = cloneOfPreset(app.dashboard.presetId);
+  app.editing = true;
+  renderGrid(app.draftLayout, true);
+  renderPalette();
+  renderChrome();
+}
+
+/** "Done": a Custom edit is kept (and persisted); editing a built-in preset without saving as Custom is discarded. */
+function doneEditing() {
+  if (app.dashboard.presetId === 'custom') {
+    app.dashboard = { ...app.dashboard, custom: app.draftLayout.slice() };
+    saveState(localStorage, app.dashboard);
+  }
+  app.editing = false;
+  app.draftLayout = null;
+  $('palette').hidden = true;
+  renderGrid(currentLayout(app.dashboard), false);
+  renderChrome();
+}
+
+/** "Reset to preset": Custom goes back to blank; a built-in preset just re-clones its own fixed default. */
+function resetEditLayout() {
+  app.dashboard = resetActivePreset(app.dashboard);
+  if (app.dashboard.presetId === 'custom') saveState(localStorage, app.dashboard);
+  app.draftLayout = cloneOfPreset(app.dashboard.presetId);
+  renderGrid(app.draftLayout, true);
+  renderPalette();
+}
+
+/** "Save as Custom": copies the current draft into Custom and switches to it, still editing. */
+function saveDraftAsCustom() {
+  app.dashboard = saveAsCustom(app.dashboard, app.draftLayout);
+  saveState(localStorage, app.dashboard);
+  renderChrome();
 }
 
 // ---- top bar and overlay ---------------------------------------------------
@@ -230,14 +359,25 @@ function renderChrome() {
   setText($('playBtn'), app.demo?.done ? 'Replay' : app.paused ? 'Play' : 'Pause');
 
   const dim = app.mode === 'live' && (app.connection === 'lost' || app.connection === 'waiting' || !app.frame);
-  $('grid').classList.toggle('dim', dim);
+  $('grid').classList.toggle('dim', dim && !app.editing);
 
   const overlay = describeOverlay();
-  $('overlay').hidden = !overlay;
+  $('overlay').hidden = !overlay || app.editing;
   if (overlay) {
     setText($('overlayTitle'), overlay.title);
     setText($('overlayText'), overlay.text);
   }
+
+  $('chromeLeft').hidden = app.editing;
+  $('editLeft').hidden = !app.editing;
+  $('chromeRight').hidden = app.editing;
+  $('editRight').hidden = !app.editing;
+  for (const tab of document.querySelectorAll('.preset-tab')) {
+    const active = tab.dataset.preset === app.dashboard.presetId;
+    tab.setAttribute('aria-selected', String(active));
+    setClass(tab, `preset-tab ${active ? 'active' : ''}`);
+  }
+  $('customDot').hidden = !app.dashboard.custom;
 }
 
 /** Update every widget and the top bar from the current state. Cheap enough to run every animation frame. */
@@ -288,7 +428,19 @@ function closeSetup() {
   $('setup').hidden = true;
 }
 
+function togglePalette() {
+  $('palette').hidden = !$('palette').hidden;
+}
+
 function wireControls() {
+  for (const tab of document.querySelectorAll('.preset-tab')) tab.addEventListener('click', () => selectPreset(tab.dataset.preset));
+  $('editBtn').addEventListener('click', enterEditMode);
+  $('paletteBtn').addEventListener('click', togglePalette);
+  $('emptyAddBtn').addEventListener('click', () => { $('palette').hidden = false; });
+  $('resetPresetBtn').addEventListener('click', resetEditLayout);
+  $('saveCustomBtn').addEventListener('click', saveDraftAsCustom);
+  $('doneBtn').addEventListener('click', doneEditing);
+
   $('sourceBadge').addEventListener('click', openSetup);
   $('setupClose').addEventListener('click', closeSetup);
   $('setup').addEventListener('click', (event) => { if (event.target === $('setup')) closeSetup(); });
@@ -345,7 +497,7 @@ function tick(now) {
  * rather than autoplaying the demo before they've asked for it.
  */
 async function main() {
-  buildGrid();
+  renderGrid(currentLayout(app.dashboard), false);
   wireControls();
   try {
     const res = await fetch('bridge.json', { cache: 'no-store' });

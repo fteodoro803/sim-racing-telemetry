@@ -1,7 +1,15 @@
 /* Standalone: this page is served from /lab/<id>/ or by the bridge, and shares nothing with the portfolio CSS.
  *
- * Everything is sized in `--u`, one "design pixel" of the 1180x820 iPad-landscape wireframe, so the
- * whole dashboard scales in proportion to any screen instead of reflowing. Dark only, for now. */
+ * Two size systems, deliberately different:
+ *  - Page chrome (top bar, card padding/radius/gutters) is sized in `--u`, one "design pixel" of
+ *    the 1180x820 iPad-landscape wireframe, so it scales in proportion to the SCREEN.
+ *  - A widget's own content (its value, label, bars) is sized with CSS container query units
+ *    (cqw/cqh), relative to that WIDGET's own box, not the screen. `.widget` is a size container
+ *    (see below), so a value's font-size reacts to how big the user actually made that widget in
+ *    edit mode, instead of a fixed size that overflows a shrunk widget or looks lost in a grown
+ *    one. Each such rule is `max(floor, min(height-based, width-based, ceiling))`: it grows with
+ *    whichever axis is tighter, so it never overflows either one, within hand-picked px bounds.
+ * Dark only, for now. */
 :root {
   --bg: #101216;
   --panel: #171a20;
@@ -121,6 +129,7 @@ button, select, input { font: inherit; color: inherit; }
 .grid.dim { opacity: .4; }
 
 .widget {
+  container-type: size;   /* makes cqw/cqh below relative to THIS widget's own box */
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -134,7 +143,7 @@ button, select, input { font: inherit; color: inherit; }
 .widget.tappable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .widget.tappable .w-label::after { content: " \21c4"; color: var(--dim); }
 .w-label {
-  font-size: calc(11 * var(--u));
+  font-size: max(9px, min(6cqh, 4cqw, 13px));
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--muted);
@@ -152,14 +161,14 @@ button, select, input { font: inherit; color: inherit; }
   line-height: 1;
   white-space: nowrap;
 }
-.v-xl { font-size: calc(42 * var(--u)); font-weight: 600; }
-.v-lg { font-size: calc(22 * var(--u)); }
-.v-md { font-size: calc(22 * var(--u)); }
-.v-huge { font-size: calc(78 * var(--u)); font-weight: 700; }
+.v-xl { font-size: max(20px, min(30cqh, 14cqw, 72px)); font-weight: 600; }
+.v-lg { font-size: max(16px, min(22cqh, 12cqw, 40px)); }
+.v-md { font-size: max(14px, min(20cqh, 10cqw, 32px)); }
+.v-huge { font-size: max(28px, min(45cqh, 28cqw, 140px)); font-weight: 700; }
 .sub {
   margin-top: calc(4 * var(--u));
   font-family: var(--mono);
-  font-size: calc(11 * var(--u));
+  font-size: max(9px, min(9cqh, 5cqw, 16px));
   color: var(--dim);
   white-space: nowrap;
 }
@@ -173,6 +182,7 @@ button, select, input { font: inherit; color: inherit; }
 /* ---- sectors ---- */
 .sector-row { display: flex; gap: calc(14 * var(--u)); flex: 1; min-height: 0; }
 .sector {
+  container-type: inline-size;   /* narrower than the widget: its own column, not the whole Sectors card */
   flex: 1;
   min-width: 0;
   display: flex;
@@ -183,10 +193,10 @@ button, select, input { font: inherit; color: inherit; }
 }
 .sector.done { border-left-color: var(--line-strong); }
 .sector.current { border-left-color: var(--accent); }
-.sector-label { font-size: calc(10 * var(--u)); letter-spacing: .05em; color: var(--dim); }
+.sector-label { font-size: max(9px, min(6cqh, 8cqw, 12px)); letter-spacing: .05em; color: var(--dim); }
 .sector.current .sector-label { color: var(--accent); }
-.sector .v { margin: calc(3 * var(--u)) 0; }
-.sector-delta { font-family: var(--mono); font-size: calc(12 * var(--u)); min-height: 1em; }
+.sector .v { margin: calc(3 * var(--u)) 0; font-size: max(13px, min(20cqh, 24cqw, 30px)); }
+.sector-delta { font-family: var(--mono); font-size: max(10px, min(8cqh, 11cqw, 15px)); min-height: 1em; }
 
 /* ---- chart ---- */
 .chart-note { position: absolute; }
@@ -194,52 +204,189 @@ button, select, input { font: inherit; color: inherit; }
 .widget.has-chart .chart-note {
   top: calc(10 * var(--u));
   right: calc(14 * var(--u));
-  font-size: calc(10 * var(--u));
+  font-size: max(9px, min(6cqh, 3cqw, 13px));
   color: var(--dim);
 }
 .widget canvas { flex: 1; width: 100%; min-height: 0; display: block; }
 .widget.has-chart .w-body { justify-content: stretch; }
+.chart-legend {
+  position: absolute;
+  top: calc(10 * var(--u));
+  right: calc(14 * var(--u));
+  display: flex;
+  gap: calc(10 * var(--u));
+  font-size: max(9px, min(6cqh, 3cqw, 13px));
+  color: var(--dim);
+}
+.legend-item::before {
+  content: "";
+  display: inline-block;
+  width: calc(10 * var(--u));
+  height: 2px;
+  margin-right: calc(4 * var(--u));
+  vertical-align: middle;
+}
+.legend-item.cur::before { background: var(--accent); }
+.legend-item.ref::before { background: var(--reference); }
 
-/* ---- rpm ---- */
-.rpm-row { display: flex; align-items: center; gap: calc(16 * var(--u)); width: 100%; }
-.rpm-value { min-width: calc(76 * var(--u)); font-size: calc(26 * var(--u)); font-weight: 600; }
-.rpm-track { position: relative; flex: 1; height: calc(10 * var(--u)); background: rgba(255,255,255,.07); border-radius: calc(4 * var(--u)); }
+/* ---- rpm ----
+ * Five shapes, chosen explicitly in edit mode (D27), not picked from the widget's size (design/
+ * Widget Responsive Behavior.dc.html, 2a-2f). All the same four elements (label, value, track,
+ * lights), just rearranged and shown/hidden per `data-variant` on the card - no JS DOM changes
+ * between them. Content still scales fluidly with the box in any of them (D25).
+ *  - compact (default): label above value, no bar, no lights.
+ *  - bar: label, value and a continuous-fill bar (with warning/limiter ticks) sit in a row.
+ *  - segmented: the same row, but the bar is the lit-segment style instead of a continuous fill.
+ *  - barOnly: label and the segmented bar, no numeric readout.
+ *  - lights: label+value, a shift-light row, and a thicker continuous bar, stacked - meant for a
+ *    widget with enough headroom that the escalation toward the limiter is worth the extra row. */
+.rpm-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas: "label" "value";
+  align-content: center;
+  row-gap: calc(4 * var(--u));
+  width: 100%;
+  height: 100%;
+}
+.rpm-label { grid-area: label; }
+.rpm-value { grid-area: value; min-width: max(48px, min(30cqh, 22cqw, 90px)); font-size: max(16px, min(45cqh, 22cqw, 44px)); font-weight: 600; }
+.rpm-track { grid-area: track; display: none; position: relative; height: max(6px, min(35cqh, 8cqw, 18px)); background: rgba(255,255,255,.07); border-radius: calc(4 * var(--u)); }
 .rpm-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: calc(4 * var(--u)); }
 .rpm-fill.warn { background: var(--amber); }
 .rpm-fill.limit { background: var(--bad); }
 .rpm-mark { position: absolute; top: calc(-3 * var(--u)); bottom: calc(-3 * var(--u)); width: 2px; background: var(--dim); }
 .rpm-mark.limit { background: var(--bad); }
+.rpm-lights { grid-area: lights; display: none; gap: max(2px, min(2cqh, 1cqw, 5px)); }
+.rpm-light { flex: 1; height: max(8px, min(14cqh, 3cqw, 20px)); border-radius: calc(3 * var(--u)); background: var(--line); }
+.rpm-light.lit { background: var(--accent); }
+.rpm-light.lit.warn { background: var(--amber); }
+.rpm-light.lit.limit { background: var(--bad); }
+
+.widget[data-variant="bar"] .rpm-row,
+.widget[data-variant="segmented"] .rpm-row,
+.widget[data-variant="barOnly"] .rpm-row,
+.widget[data-variant="lights"] .rpm-row {
+  align-items: center;
+  column-gap: calc(16 * var(--u));
+}
+.widget[data-variant="bar"] .rpm-value,
+.widget[data-variant="segmented"] .rpm-value,
+.widget[data-variant="lights"] .rpm-value { font-size: max(16px, min(45cqh, 10cqw, 44px)); }
+
+.widget[data-variant="bar"] .rpm-row { grid-template-columns: auto auto 1fr; grid-template-areas: "label value track"; }
+.widget[data-variant="bar"] .rpm-track { display: block; }
+
+.widget[data-variant="segmented"] .rpm-row { grid-template-columns: auto auto 1fr; grid-template-areas: "label value lights"; }
+.widget[data-variant="segmented"] .rpm-lights { display: flex; }
+
+.widget[data-variant="barOnly"] .rpm-row { grid-template-columns: auto 1fr; grid-template-areas: "label lights"; }
+.widget[data-variant="barOnly"] .rpm-value { display: none; }
+.widget[data-variant="barOnly"] .rpm-lights { display: flex; }
+
+.widget[data-variant="lights"] .rpm-row {
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto auto;
+  grid-template-areas: "label value" "lights lights" "track track";
+  row-gap: calc(10 * var(--u));
+}
+.widget[data-variant="lights"] .rpm-track { display: block; height: max(10px, min(6cqh, 3cqw, 22px)); }
+.widget[data-variant="lights"] .rpm-lights { display: flex; }
 
 /* ---- gear and speed ---- */
-.gear-hint { margin-top: calc(6 * var(--u)); font-family: var(--mono); font-size: calc(16 * var(--u)); color: var(--muted); }
+.gear-hint { margin-top: calc(6 * var(--u)); font-family: var(--mono); font-size: max(10px, min(10cqh, 6cqw, 22px)); color: var(--muted); }
 .speed-row { display: flex; align-items: baseline; gap: calc(8 * var(--u)); }
-.unit { font-size: calc(16 * var(--u)); color: var(--muted); }
+.unit { font-size: max(10px, min(10cqh, 6cqw, 22px)); color: var(--muted); }
 
-/* ---- pedals ---- */
-.pedal-row { flex: 1; display: flex; justify-content: space-around; gap: calc(16 * var(--u)); min-height: 0; padding-top: calc(8 * var(--u)); }
-.pedal { display: flex; flex-direction: column; align-items: center; gap: calc(6 * var(--u)); min-height: 0; }
-.pedal-pct { font-family: var(--mono); font-size: calc(13 * var(--u)); color: var(--muted); }
+/* ---- pedals ----
+ * Clutch, brake, throttle (design/Widget Responsive Behavior.dc.html, 4a/4b): vertical bars, %
+ * above and a short name below each, by default (`vertical` variant); the `horizontal` variant
+ * flips to stacked horizontal bars, name first and % last - chosen explicitly in edit mode, not
+ * picked from the widget's size (D27). Same DOM and the same `--fill` custom property drive both:
+ * only what CSS does with it (a height or a width) changes. */
+.pedal-row { flex: 1; display: flex; justify-content: space-around; align-items: stretch; gap: calc(16 * var(--u)); min-height: 0; padding-top: calc(8 * var(--u)); }
+.pedal {
+  container-type: inline-size;   /* one of 3 columns (or, flipped, one of 3 rows): its own box, not the whole Pedals card */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  min-height: 0;
+}
+.pedal-pct {
+  font-family: var(--mono);
+  font-size: max(10px, min(10cqh, 26cqw, 18px));
+  color: var(--muted);
+  /* fixed width (not just centred text) so "100%" doesn't nudge the bars when a pedal goes full - the
+     text itself would still centre fine without this, but the pedal's own flex-basis would widen */
+  width: max(30px, min(10cqh, 32cqw, 46px));
+  text-align: center;
+}
+.pedal-pct.throttle { color: var(--accent); }
+.pedal-pct.brake { color: var(--bad); }
+.pedal-pct.clutch { color: var(--muted); }
 .pedal-track {
   position: relative;
   flex: 1;
-  width: calc(22 * var(--u));
+  width: max(10px, min(14cqh, 55cqw, 40px));
   min-height: 0;
   background: rgba(255,255,255,.07);
   border-radius: calc(4 * var(--u));
   overflow: hidden;
 }
-.pedal-fill { position: absolute; left: 0; bottom: 0; width: 100%; border-radius: calc(4 * var(--u)); }
+.pedal-fill { position: absolute; left: 0; bottom: 0; width: 100%; height: var(--fill, 0%); border-radius: calc(4 * var(--u)); }
 .pedal-fill.throttle { background: var(--accent); }
-.pedal-fill.brake { background: var(--amber); }
+.pedal-fill.brake { background: var(--bad); }
+.pedal-fill.clutch { background: var(--muted); }
 .pedal-fill.idle { background: var(--neutral); }
-.pedal-name { font-size: calc(10 * var(--u)); letter-spacing: .05em; color: var(--dim); }
+.pedal-name { order: 2; font-size: max(9px, min(6cqh, 18cqw, 12px)); letter-spacing: .05em; color: var(--dim); }
+
+.widget[data-variant="horizontal"] .pedal-row { flex-direction: column; justify-content: center; gap: calc(5 * var(--u)); padding-top: 0; }
+.widget[data-variant="horizontal"] .pedal { flex-direction: row; align-items: center; gap: calc(8 * var(--u)); }
+.widget[data-variant="horizontal"] .pedal-name { order: -1; width: max(20px, min(10cqh, 30cqw, 40px)); text-align: left; }
+.widget[data-variant="horizontal"] .pedal-track { width: auto; height: max(4px, min(30cqh, 3cqw, 10px)); }
+.widget[data-variant="horizontal"] .pedal-fill { width: var(--fill, 0%); height: 100%; }
+.widget[data-variant="horizontal"] .pedal-pct { order: 1; width: max(24px, min(10cqh, 16cqw, 40px)); text-align: right; }
+
+/* ---- tyres (design/Widget Responsive Behavior.dc.html, 1a/1b; D26) ----
+ * Adjusted per the user's updated design: the tyre + caliper now fill most of the box (~60%),
+ * tighter gaps between the four corners, than the first pass. */
+.tyre-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: max(4px, min(3cqh, 3cqw, 16px));
+  place-items: center;
+}
+.tyre-corner { display: flex; align-items: center; gap: max(2px, min(1.3cqh, 1.1cqw, 10px)); }
+.tyre-corner.mirrored { flex-direction: row-reverse; }
+.tyre {
+  aspect-ratio: 4 / 5;
+  width: max(60px, min(35cqh, 27cqw, 170px));
+  border-radius: max(10px, min(6cqh, 5cqw, 28px));
+  background: var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s;
+}
+.tyre-temp { font-family: var(--mono); font-weight: 700; color: var(--bg); font-size: max(18px, min(11.5cqh, 8.7cqw, 55px)); }
+.tyre-temp.dim { color: var(--dim); }
+.caliper {
+  width: max(8px, min(4.7cqh, 4cqw, 22px));
+  height: max(30px, min(19cqh, 15cqw, 90px));
+  border-radius: max(3px, min(1.5cqh, 1.5cqw, 8px));
+  background: var(--line);
+  transition: background .2s;
+}
 
 /* ---- lap table ---- */
 .table-wrap { flex: 1; overflow: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: calc(12 * var(--u)); }
+table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: max(11px, min(6cqh, 3cqw, 16px)); }
 th, td { padding: calc(5 * var(--u)) calc(6 * var(--u)); text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
-th { position: sticky; top: 0; background: var(--panel); font: calc(10 * var(--u)) system-ui, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+th { position: sticky; top: 0; background: var(--panel); font-size: max(9px, min(5cqh, 2.5cqw, 13px)); font-family: system-ui, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
 tr.live td { color: var(--accent); }
 tr.invalid td { color: var(--dim); }
 tr.invalid td[colspan] { text-align: left; font-family: system-ui, sans-serif; }
@@ -296,3 +443,194 @@ td.best { color: var(--best); font-weight: 600; }
 .steps { margin: calc(12 * var(--u)) 0; padding-left: calc(20 * var(--u)); color: var(--muted); line-height: 1.7; }
 .modal-actions { display: flex; align-items: center; justify-content: space-between; gap: calc(12 * var(--u)); }
 .link { color: var(--accent); text-decoration: none; }
+
+/* ---- preset switcher ---- */
+.presets { display: flex; gap: 2px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: calc(7 * var(--u)); }
+.preset-tab {
+  position: relative;
+  font-size: calc(12 * var(--u));
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: calc(5 * var(--u));
+  padding: calc(6 * var(--u)) calc(12 * var(--u));
+  cursor: pointer;
+}
+.preset-tab.active { background: var(--accent); color: #0d1117; font-weight: 600; }
+.edited-dot {
+  display: inline-block;
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  margin-left: calc(6 * var(--u));
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+/* ---- edit-mode top bar ---- */
+.editing-label { font-size: calc(12 * var(--u)); color: var(--accent); font-weight: 600; }
+
+/* ---- edit mode: widget chrome ---- */
+.grid.editing .widget { border-style: dashed; cursor: default; }
+.grid.editing .widget.is-dragging { border-color: var(--accent); border-style: solid; box-shadow: 0 calc(18 * var(--u)) calc(40 * var(--u)) rgba(0, 0, 0, .55); z-index: 10; }
+.widget.collide { background: rgba(255, 107, 107, .1); border-color: var(--bad) !important; }
+.widget.editable { position: relative; }
+.edit-chrome { position: absolute; inset: 0; pointer-events: none; }
+.drag-handle, .remove-btn {
+  position: absolute;
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+  border-radius: calc(6 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(13 * var(--u));
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px dashed rgba(255, 255, 255, .2);
+  background: rgba(255, 255, 255, .06);
+  color: #c7cbd1;
+}
+.drag-handle { top: calc(2 * var(--u)); left: calc(2 * var(--u)); cursor: grab; touch-action: none; }
+.remove-btn { top: calc(2 * var(--u)); right: calc(2 * var(--u)); border-color: rgba(255, 107, 107, .4); background: rgba(255, 107, 107, .1); color: var(--bad); }
+.resize-handle {
+  position: absolute;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  border: 1px dashed rgba(255, 255, 255, .15);
+  pointer-events: auto;
+  touch-action: none;
+}
+.resize-handle.nw { top: calc(-16 * var(--u)); left: calc(-16 * var(--u)); cursor: nwse-resize; }
+.resize-handle.ne { top: calc(-16 * var(--u)); right: calc(-16 * var(--u)); cursor: nesw-resize; }
+.resize-handle.sw { bottom: calc(-16 * var(--u)); left: calc(-16 * var(--u)); cursor: nesw-resize; }
+.resize-handle.se { bottom: calc(-16 * var(--u)); right: calc(-16 * var(--u)); cursor: nwse-resize; }
+.size-tag {
+  position: absolute;
+  bottom: calc(4 * var(--u));
+  left: calc(8 * var(--u));
+  font-family: var(--mono);
+  font-size: calc(9 * var(--u));
+  color: var(--neutral);
+}
+.variant-select {
+  position: absolute;
+  top: calc(2 * var(--u));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(120 * var(--u));
+  font-size: calc(11 * var(--u));
+  color: #c7cbd1;
+  background: #101216;
+  border: 1px solid var(--line);
+  border-radius: calc(6 * var(--u));
+  padding: calc(4 * var(--u)) calc(6 * var(--u));
+  pointer-events: auto;
+  cursor: pointer;
+}
+.ghost {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: calc(6 * var(--u));
+  background: rgba(90, 167, 255, .08);
+  pointer-events: none;
+  z-index: 20;
+}
+.ghost.invalid { border-color: var(--bad); background: rgba(255, 107, 107, .08); }
+
+/* ---- palette drawer ---- */
+.palette {
+  position: absolute;
+  top: calc(48 * var(--u));
+  right: 0;
+  bottom: 0;
+  width: min(calc(300 * var(--u)), 80vw);
+  padding: calc(16 * var(--u));
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: calc(-12 * var(--u)) 0 calc(30 * var(--u)) rgba(0, 0, 0, .4);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+  z-index: 15;
+}
+.palette-title { font-size: calc(13 * var(--u)); font-weight: 700; }
+.palette-group-title { font-size: calc(10 * var(--u)); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: calc(4 * var(--u)); }
+.palette-list { display: flex; flex-direction: column; gap: calc(6 * var(--u)); }
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  border-radius: calc(6 * var(--u));
+  background: rgba(255, 255, 255, .03);
+  border: 0;
+  color: var(--text);
+  cursor: grab;
+  text-align: left;
+  font: inherit;
+}
+.palette-item:disabled, .palette-item.added { opacity: .4; cursor: default; }
+.palette-item.later { opacity: .45; cursor: default; }
+.palette-swatch { width: calc(36 * var(--u)); height: calc(26 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--bg); border: 1px solid var(--line); flex: 0 0 auto; }
+.palette-name { flex: 1; font-size: calc(13 * var(--u)); }
+.palette-size { font-size: calc(11 * var(--u)); color: var(--dim); font-family: var(--mono); }
+.soon { font-size: calc(9 * var(--u)); color: var(--dim); border: 1px solid var(--line); border-radius: 99px; padding: calc(2 * var(--u)) calc(7 * var(--u)); }
+
+/* ---- Custom, empty state ---- */
+.empty-state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  max-width: calc(320 * var(--u));
+  z-index: 4;
+}
+.empty-title { font-size: calc(16 * var(--u)); font-weight: 600; color: #c7cbd1; }
+.empty-text { font-size: calc(13 * var(--u)); color: var(--dim); }
+
+/* ---- phone: single-column stack (DASHBOARD_PLAN.md section 8.3) ---- */
+@media (max-width: 700px) and (orientation: portrait) {
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(calc(84 * var(--u)), auto);
+    gap: calc(10 * var(--u));
+    margin: calc(10 * var(--u));
+    overflow-y: auto;
+  }
+  .widget { grid-column: span 2 !important; grid-row: auto !important; min-height: calc(84 * var(--u)); }
+  .w-delta { order: 1; }
+  .w-currentLap { order: 2; }
+  .w-gear, .w-speed { grid-column: span 1 !important; order: 3; }
+  .w-rpm { order: 4; }
+  .w-sectors { order: 5; }
+  .w-lastLap, .w-bestLap { grid-column: span 1 !important; order: 6; }
+  .w-predicted { order: 7; }
+  .w-deltaChart, .w-speedChart { order: 8; }
+  .w-pedals { order: 9; }
+  .w-tyres { order: 10; }
+  .w-lapTable { order: 11; height: calc(200 * var(--u)); }
+  .palette { top: 0; width: 100%; }
+  .presets, #editBtn, #demoControls .speed { display: none; }
+}
+
+/* ---- phone landscape: top-priority cluster only (DASHBOARD_PLAN.md section 8.3) ---- */
+@media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: calc(10 * var(--u));
+  }
+  .widget { grid-column: auto !important; grid-row: auto !important; }
+  .w-deltaChart, .w-speedChart, .w-lastLap, .w-bestLap, .w-predicted, .w-pedals, .w-tyres, .w-lapTable { display: none; }
+  .presets, #editBtn, .badge, .status { display: none; }
+}
