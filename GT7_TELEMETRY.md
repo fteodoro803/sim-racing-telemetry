@@ -20,7 +20,7 @@ for each. A worked real example (values from an actual PS4 packet) is in the REA
 | `rpm`, `rpm_after_clutch` | engine rpm | **in use** (RPM widget) |
 | `rpm_warning`, `rpm_limiter` | shift-alert and limiter rpm | **in use** (RPM widget's markers) |
 | `estimated_top_speed` | top speed in current gearing | decoded, unused |
-| `gear`, `suggested_gear` | current gear (0 = neutral, guessed), suggested gear (15 = none) | **in use** (Gear widget) |
+| `gear`, `suggested_gear` | current gear (0 = neutral or reverse, ambiguous), suggested gear (15 = none) | **in use** (Gear widget). Reverse isn't in this byte at all — the frame's `gear` is -1 when `velocity` opposes `rotation`'s heading (confirmed on a real PS4, D21) |
 | `clutch`, `clutch_engagement` | 0–1 | decoded, unused |
 | `gear_ratios` (×8), `transmission_top_speed` | gearbox detail | decoded, unused |
 | `throttle`, `brake` | pedals, 0–255 | **in use** (Pedals widget) |
@@ -68,6 +68,7 @@ From a recorded type-A session, about 66,000 packets, in a free run or time tria
 - **Lap counter and last lap:** the game updates `last_lap` in the same packet that changes the lap counter. After a session restart the counter reads 0 until the first crossing of the line.
 - **Flags:** bit 0 (on track) was set for about 99% of packets, bit 2 (loading) for a handful, and bits 3 (in gear) and 5 (rev-limit alert) behaved plausibly. Bit 6, documented as the handbrake, was set for about a third of the session, which doesn't fit, so its meaning is unconfirmed.
 - **Gear:** values 0 to 8 were seen; 0 is presumably neutral (a short stretch at the start). The suggested gear is 15 when there is no suggestion (about two thirds of packets), as documented.
+- **Reverse:** confirmed with a dedicated capture (drive, stop, reverse back the same way, stop; `bridge/tests/fixtures/gt7-ps4-reverse.jsonl.gz`, D21). The gear byte reads 0 throughout reverse, identical to neutral — GT7 sends no separate signal for it. `velocity` (0x10) opposing the heading derived from `rotation`'s yaw (0x1C+4) flips sign cleanly between forward and reverse, so the bridge infers reverse from that instead (`_is_reversing` in `bridge/frames.py`).
 - **Rev markers:** for this car the rev warning was 6500 and the limiter 7000; rpm ran from about 640 to 6930. The estimated top speed was 283 (km/h, consistent with a top speed of 250).
 - **Position:** `x` and `z` spanned about ±850 m and `y` (height) only ±5 m, so `x, z` is the ground plane.
 - **Constants:** water and oil temperature were fixed at 85 and 110, as documented, so they carry no information.
