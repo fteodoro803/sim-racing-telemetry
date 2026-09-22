@@ -95,7 +95,7 @@ used for yet, is in [GT7_TELEMETRY.md](GT7_TELEMETRY.md#at-a-glance-every-field-
 | `x`, `z` | m | position on the ground plane |
 | `speed` | km/h | |
 | `throttle`, `brake` | 0-100 | |
-| `gear` | int | 0 is neutral. Reverse isn't handled yet |
+| `gear` | int | 0 is neutral, -1 is reverse (inferred from velocity vs. heading — GT7's gear byte doesn't signal it, see D21) |
 | `suggestedGear` | int, optional | the gear the game suggests; equal to `gear` when there is no suggestion |
 | `rpm` | rpm | |
 | `rpmWarning`, `rpmLimiter` | rpm, optional | where the game's shift alert starts, and the limiter. Used for the rev markers |

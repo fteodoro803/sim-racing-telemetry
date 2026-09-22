@@ -55,6 +55,25 @@ class FrameConversionTest(unittest.TestCase):
         f = to_frame(dict(self.decoded, gear=3, suggested_gear=15), 0)
         self.assertEqual((f["gear"], f["suggestedGear"]), (3, 3))
 
+    def test_reverse_is_inferred_from_velocity_opposing_heading(self):
+        # Confirmed on a real PS4 session (2026-09-22, D21): GT7's gear byte reads 0 throughout
+        # reverse, same as neutral, so reverse has to come from velocity vs. heading instead.
+        moving_against_heading = dict(self.decoded, gear=0, rotation=(0, 0, 0), velocity=(0, 0, 5))
+        self.assertEqual(to_frame(moving_against_heading, 0)["gear"], -1)
+
+    def test_reverse_is_not_inferred_below_the_speed_threshold(self):
+        barely_creeping = dict(self.decoded, gear=0, rotation=(0, 0, 0), velocity=(0, 0, 0.1))
+        self.assertEqual(to_frame(barely_creeping, 0)["gear"], 0)
+
+    def test_reverse_is_not_inferred_from_a_nonzero_gear(self):
+        # Forward gears (1-8) are only ever seen driving forward, so only gear 0 is ambiguous.
+        moving_against_heading = dict(self.decoded, gear=3, rotation=(0, 0, 0), velocity=(0, 0, 5))
+        self.assertEqual(to_frame(moving_against_heading, 0)["gear"], 3)
+
+    def test_forward_motion_does_not_look_like_reverse(self):
+        moving_with_heading = dict(self.decoded, gear=0, rotation=(0, 0, 0), velocity=(0, 0, -5))
+        self.assertEqual(to_frame(moving_with_heading, 0)["gear"], 0)
+
     def test_flags_become_hold_signals(self):
         f = to_frame(dict(self.decoded, flags=0b001), 0)
         self.assertEqual((f["onTrack"], f["paused"], f["loading"]), (True, False, False))

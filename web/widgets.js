@@ -266,8 +266,8 @@ const gear = {
       setText(r.hint, NBSP);
       return;
     }
-    // Zero is treated as neutral. How GT7 encodes neutral and reverse is unconfirmed.
-    setText(r.value, frame.gear === 0 ? 'N' : String(frame.gear));
+    // Zero is neutral; -1 is reverse (GT7 doesn't signal reverse directly, see bridge/frames.py).
+    setText(r.value, frame.gear === 0 ? 'N' : frame.gear === -1 ? 'R' : String(frame.gear));
     const suggested = frame.suggestedGear;
     setText(r.hint, suggested > 0 && suggested !== frame.gear ? `→ ${suggested}` : NBSP);
   },

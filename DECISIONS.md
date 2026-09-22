@@ -39,6 +39,7 @@ When an open item is decided: move it to the Decided log with a one-line rationa
 | D18 | **The first version uses the Claude Design wireframes in `design/` as they are, to test live data; a redesign comes later.** They are low-fidelity, so visual polish isn't the goal. The grid spec, widget list and corrections are in a plan doc. | [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md); [`CLAUDE.md`](CLAUDE.md) |
 | D18 (follow-up) | **The wireframes in `design/` are committed, and sector cards start with one delta (versus the best sector).** | [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) §5 |
 | D19 | **The first version's Driving widgets are speed, gear (with suggested gear), rpm and pedals.** Driver aids (TCS, ASM, ABS, handbrake) and boost aren't wanted. Steering is deferred to its own session. | [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) §3, §5; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issues 12–14 |
+| D21 | **GT7 doesn't encode reverse in the gear byte — it reads 0, the same as neutral, throughout.** Confirmed with a dedicated real-PS4 capture. The frame's `gear` is instead inferred as -1 when `velocity` opposes the heading derived from `rotation`'s yaw, below a small speed threshold it stays neutral (direction is meaningless near a stop). | [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); `bridge/frames.py` (`_is_reversing`); `bridge/tests/fixtures/gt7-ps4-reverse.jsonl.gz`; [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) log 10 |
 
 ---
 
