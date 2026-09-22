@@ -35,7 +35,7 @@ for each. A worked real example (values from an actual PS4 packet) is in the REA
 | `time_value` | the game's own clock, ms | **in use** (the frame's timestamp, when trusted; [O14](DECISIONS.md)) |
 | `laps_in_race` | 0 in free run/time trial, confirmed | decoded, unused |
 | `position_values` | two numbers, meaning still unclear | decoded, unused |
-| `flags` | paused / loading / on-track / in-gear / rev-limit-alert / handbrake and others | paused/loading/on-track **in use** (holds timing); the rest decoded, unused |
+| `flags` | paused / loading / on-track / in-gear / rev-limit-alert / handbrake and others | paused/loading/on-track **in use** (holds timing); rev-limit-alert **in use** (RPM widget flash); the rest decoded, unused |
 | `packet_id`, `car_code` | sequence number, car identifier | decoded, unused |
 
 ## Transport
@@ -195,7 +195,7 @@ A 16-bit field. Bits 0–2 also drive the interrupted-lap handling ([D7](DECISIO
 | 2 | Loading / processing | v1 (`loading`) |
 | 3 | In gear | no |
 | 4 | Has turbo | no |
-| 5 | Rev-limit alert | no |
+| 5 | Rev-limit alert | v1 (`revLimitAlert`; RPM widget flash) |
 | 6 | Handbrake active | no (set for a third of a normal session, so the meaning is unconfirmed) |
 | 7 | Lights active | no |
 | 8 | High beams | no |

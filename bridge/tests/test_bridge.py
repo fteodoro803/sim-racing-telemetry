@@ -84,6 +84,10 @@ class FrameConversionTest(unittest.TestCase):
         f = to_frame(dict(self.decoded, flags=0b100), 0)
         self.assertTrue(f["loading"])
 
+    def test_rev_limit_alert_is_bit_5_of_flags(self):
+        self.assertFalse(to_frame(dict(self.decoded, flags=0), 0)["revLimitAlert"])
+        self.assertTrue(to_frame(dict(self.decoded, flags=1 << 5), 0)["revLimitAlert"])
+
     def test_the_frame_is_json_serialisable(self):
         json.dumps(to_frame(self.decoded, 0))
 

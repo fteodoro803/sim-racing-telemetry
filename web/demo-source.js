@@ -53,6 +53,8 @@ export class DemoSource {
       tyreTemp: tyreTempAt(d.speed[i]),
       gear: d.gear[i], suggestedGear: d.suggestedGear[i], rpm: d.rpm[i],
       rpmWarning: d.rpmWarning, rpmLimiter: d.rpmLimiter,
+      // The demo data has no recorded flags byte, so approximate the game's own alert bit from rpm.
+      revLimitAlert: d.rpm[i] >= d.rpmLimiter * 0.98,
     };
     const last = d.lastLapAt[i];
     if (last !== undefined) f.lastLap = last;
