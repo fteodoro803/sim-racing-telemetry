@@ -242,9 +242,12 @@ const rpm = {
     }
     const limiter = frame.rpmLimiter > 0 ? frame.rpmLimiter : 9000;
     const max = limiter * 1.08;
-    const level = frame.rpm >= limiter * 0.98 ? 'limit' : frame.rpmWarning > 0 && frame.rpm >= frame.rpmWarning ? 'warn' : '';
+    // `revLimitAlert` is the game's own "actively bouncing off the limiter" bit; fall back to the
+    // rpm/limiter threshold for cars or frames where that bit hasn't been confirmed reliable.
+    const atLimit = frame.revLimitAlert || frame.rpm >= limiter * 0.98;
+    const level = atLimit ? 'limit' : frame.rpmWarning > 0 && frame.rpm >= frame.rpmWarning ? 'warn' : '';
     setText(r.value, String(Math.round(frame.rpm)));
-    setClass(r.fill, `rpm-fill ${level}`);
+    setClass(r.fill, `rpm-fill ${level} ${frame.revLimitAlert ? 'flash' : ''}`);
     r.fill.style.width = `${Math.min(100, (frame.rpm / max) * 100).toFixed(1)}%`;
     r.warn.style.left = frame.rpmWarning > 0 ? `${((frame.rpmWarning / max) * 100).toFixed(1)}%` : '-10%';
     r.limit.style.left = `${((limiter / max) * 100).toFixed(1)}%`;

@@ -207,8 +207,11 @@ button, select, input { font: inherit; color: inherit; }
 .rpm-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: calc(4 * var(--u)); }
 .rpm-fill.warn { background: var(--amber); }
 .rpm-fill.limit { background: var(--bad); }
+.rpm-fill.flash { animation: rpm-flash 0.2s steps(1) infinite; }
 .rpm-mark { position: absolute; top: calc(-3 * var(--u)); bottom: calc(-3 * var(--u)); width: 2px; background: var(--dim); }
 .rpm-mark.limit { background: var(--bad); }
+
+@keyframes rpm-flash { 50% { opacity: 0.4; } }
 
 /* ---- gear and speed ---- */
 .gear-hint { margin-top: calc(6 * var(--u)); font-family: var(--mono); font-size: calc(16 * var(--u)); color: var(--muted); }
