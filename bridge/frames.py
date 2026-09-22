@@ -115,7 +115,9 @@ def to_frame(decoded, t_ms):
     Speed goes from m/s to km/h and the pedals from 0-255 to 0-100. Position is x and z, the ground
     plane (y is height). `lastLap` is only included when the game reports one (it is -1 before the
     first lap). The flags become `paused`, `loading` and `onTrack`, which the lap tracker uses to
-    hold timing. `totalLaps` is left out for now because its offset in the packet is unconfirmed.
+    hold timing, plus `revLimitAlert` (the game's own "bouncing off the limiter" bit, separate from
+    the static `rpmLimiter` threshold). `totalLaps` is left out for now because its offset in the
+    packet is unconfirmed.
     `gear` is -1 in reverse, inferred per `_is_reversing` since GT7 doesn't signal it directly.
 
     `t_ms` comes from a `GameClock`, which prefers the game's own clock to arrival times.
@@ -136,6 +138,7 @@ def to_frame(decoded, t_ms):
         "rpm": round(decoded["rpm"]),
         "rpmWarning": decoded["rpm_warning"],
         "rpmLimiter": decoded["rpm_limiter"],
+        "revLimitAlert": flags["rev_limit_alert"],
         "paused": flags["paused"],
         "loading": flags["loading"],
         "onTrack": flags["car_on_track"],
