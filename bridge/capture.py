@@ -162,6 +162,10 @@ def main(argv=None):
                         help="packet type to request (default A; B, ~ and C carry more fields)")
     parser.add_argument("--out", help="record raw packets to this file (.gz to compress)")
     parser.add_argument("--seconds", type=float, help="stop after this many seconds")
+    parser.add_argument("--heartbeat-port", type=int, default=HEARTBEAT_PORT,
+                        help=f"port to send the console heartbeat to (default {HEARTBEAT_PORT})")
+    parser.add_argument("--telemetry-port", type=int, default=TELEMETRY_PORT,
+                        help=f"local port to receive telemetry on (default {TELEMETRY_PORT})")
     args = parser.parse_args(argv)
     try:
         check_console_address(args.ip)
@@ -169,7 +173,8 @@ def main(argv=None):
         parser.error(str(err))
 
     print(f"Asking {args.ip} for type-{args.packet_type} packets. Press Ctrl-C to stop.")
-    stats = capture(args.ip, packet_type=args.packet_type, seconds=args.seconds, out=args.out)
+    stats = capture(args.ip, packet_type=args.packet_type, seconds=args.seconds, out=args.out,
+                    send_port=args.heartbeat_port, recv_port=args.telemetry_port)
     report(stats, args.packet_type, args.out)
     return 0 if stats.packets > stats.unreadable else 1
 

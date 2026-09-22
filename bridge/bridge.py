@@ -114,6 +114,10 @@ def main(argv=None):
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"web port (default {DEFAULT_PORT})")
     parser.add_argument("--host", default="0.0.0.0",
                         help="address to serve on; 127.0.0.1 keeps it to this computer (default: all)")
+    parser.add_argument("--heartbeat-port", type=int, default=HEARTBEAT_PORT,
+                        help=f"port to send the console heartbeat to (default {HEARTBEAT_PORT})")
+    parser.add_argument("--telemetry-port", type=int, default=TELEMETRY_PORT,
+                        help=f"local port to receive telemetry on (default {TELEMETRY_PORT})")
     parser.add_argument("--web-dir", type=Path, default=DEFAULT_WEB_DIR, help="folder to serve")
     parser.add_argument("--record", help="also record raw packets to this file (.gz to compress)")
     args = parser.parse_args(argv)
@@ -128,12 +132,13 @@ def main(argv=None):
     fake = None
     ip = args.ip
     if args.fake_console:
-        fake = FakeConsole(listen_port=HEARTBEAT_PORT, host="127.0.0.1", say=lambda msg: None)
+        fake = FakeConsole(listen_port=args.heartbeat_port, host="127.0.0.1", say=lambda msg: None)
         fake.start()
         ip = "127.0.0.1"
         print("Using the built-in fake console (made-up numbers).", flush=True)
 
     bridge = Bridge(ip, packet_type=args.packet_type, host=args.host, http_port=args.port,
+                    heartbeat_port=args.heartbeat_port, telemetry_port=args.telemetry_port,
                     web_dir=args.web_dir, record=args.record)
     bridge.start()
     print(f"Asking {ip} for type-{args.packet_type} packets.", flush=True)
