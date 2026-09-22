@@ -40,6 +40,7 @@ When an open item is decided: move it to the Decided log with a one-line rationa
 | D18 (follow-up) | **The wireframes in `design/` are committed, and sector cards start with one delta (versus the best sector).** | [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) §5 |
 | D19 | **The first version's Driving widgets are speed, gear (with suggested gear), rpm and pedals.** Driver aids (TCS, ASM, ABS, handbrake) and boost aren't wanted. Steering is deferred to its own session. | [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) §3, §5; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issues 12–14 |
 | D21 | **GT7 doesn't encode reverse in the gear byte — it reads 0, the same as neutral, throughout.** Confirmed with a dedicated real-PS4 capture. The frame's `gear` is instead inferred as -1 when `velocity` opposes the heading derived from `rotation`'s yaw, below a small speed threshold it stays neutral (direction is meaningless near a stop). | [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md); `bridge/frames.py` (`_is_reversing`); `bridge/tests/fixtures/gt7-ps4-reverse.jsonl.gz`; [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) log 10 |
+| D22 | **A non-technical user starts the bridge with a double-click launcher (`start.command` / `start.bat`), not a terminal command.** It asks for the PS4's IP once and remembers it locally. Cheapest option that removes the "type a command" step without taking on installer/packaging work (was O16, option 1); options 2-4 (packaged executable, URL-scheme installer, do nothing) stay open if this isn't enough. | [`bridge/README.md`](bridge/README.md); `bridge/start.command`, `bridge/start.bat` |
 
 ---
 
@@ -83,6 +84,8 @@ The bridge first stamped frames with the time the packet arrived. On a real sess
 Loading frames are currently dropped and the interrupted lap is invalidated, but completed laps and the reference line are kept. A load might mean a new track or car (so old laps are meaningless), or it might be a brief blip mid-session (so a reset would wipe good data). We don't yet know what the game does.
 *Options:* keep laps and drop frames only (current); reset on any load; reset only on a load that ends with a different lap counter or a car far from the reference line.
 *Recommendation:* keep the current behaviour until real packets show what a load looks like ([`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 5), then decide.
+
+~~**O16. How should a non-technical user start the bridge, without downloading files and typing terminal commands?**~~ **Decided as D22**: a double-click launcher script. Packaging it as an executable, or a `gt7bridge://` URL-scheme installer, were considered and rejected for now as more packaging work than the problem currently warrants; revisit if the launcher script isn't enough.
 
 ---
 

@@ -18,11 +18,14 @@ There is nothing to install: it uses only the Python 3 standard library.
 2. Make sure the PS4 and this computer are on the same network (the same router, and not a guest
    network that isolates devices from each other).
 3. Start GT7 and get into a race, a time trial or free practice. Menus may send nothing.
-4. Start the bridge:
-
-```bash
-python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP
-```
+4. Start the bridge, either way:
+   - **Double-click** `start.command` (macOS) or `start.bat` (Windows) in this folder. It asks for
+     the PS4's IP the first time and remembers it (in a local `.bridge-ip` file, not committed) for
+     next time, so there's nothing to type after that.
+   - **Or from a terminal**, if you'd rather pass the address directly:
+     ```bash
+     python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP
+     ```
 
 It prints two addresses. Open the first in a browser on this computer; open the second on your iPad
 (on the same Wi-Fi). The page connects to the bridge by itself.
@@ -76,6 +79,7 @@ npm run test:bridge
 
 | File | What it does |
 |---|---|
+| `start.command` / `start.bat` | Double-click launchers (macOS / Windows): ask for the PS4's IP once, then run `bridge.py` |
 | `bridge.py` | The bridge: capture, frames, WebSocket, and serving the page |
 | `ws_server.py` | HTTP and WebSocket server on one port, standard library only |
 | `frames.py` | Converts decoded GT7 packets into the page's frame format |
