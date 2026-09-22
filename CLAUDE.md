@@ -8,6 +8,7 @@ Working conventions for keeping this repo's documentation current. Read alongsid
 - [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) — what GT7's telemetry packet provides, its units and quirks, and what this project does with each field. Update it when something about the packet is verified or turns out to be wrong, and when a field starts being used.
 - [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) — the dashboard's grid spec, widget list, wireframe corrections and build order, with an Implementation Log. Keep the log current as the dashboard is built.
 - `TRACK_MAP_PLAN.md` — will hold the design for the track map, split editor and track identification, plus an Implementation Log of what's actually been built. Create it when that pass starts.
+- [`AUDIT_PLAN.md`](AUDIT_PLAN.md) — a checklist for a dedicated higher-effort audit pass, not yet run. Findings from it go into `BUGS.md`/`DECISIONS.md`/`PROJECT_CONTEXT.md` as usual, not back into this file.
 
 There is deliberately no design-system doc or architecture-map doc (see D10 in `DECISIONS.md`); the README covers layout and the frame format.
 
