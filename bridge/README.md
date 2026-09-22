@@ -34,6 +34,17 @@ macOS may ask whether Python may accept incoming network connections. Allow it, 
 console's data nor the iPad's page can arrive. Add `--host 127.0.0.1` to keep the page to this
 computer only.
 
+The web/WebSocket port (`--port`, default 8765) and the two UDP ports used to talk to the console
+(`--heartbeat-port` and `--telemetry-port`, default 33739/33740, GT7's own defaults) can all be
+changed, for example to run more than one bridge on the same machine or to avoid a port already in
+use:
+
+```bash
+python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP --port 8766 --heartbeat-port 33741 --telemetry-port 33742
+```
+
+`capture.py` takes the same `--heartbeat-port` and `--telemetry-port` flags.
+
 To record the raw packets while it runs (useful as test data), add `--record captures/session.jsonl.gz`.
 `captures/` is ignored by git; a capture worth keeping as a test fixture should be copied to
 `bridge/tests/fixtures/` on purpose.

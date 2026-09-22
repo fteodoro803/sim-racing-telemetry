@@ -293,6 +293,21 @@ class BridgeFailureTest(unittest.TestCase):
         stats = capture("127.0.0.1", send_port=0, recv_port=0, seconds=1.0, say=lines.append)
         self.assertEqual(stats.packets, 0)
 
+    def test_heartbeat_and_telemetry_port_flags_reach_the_capture_socket(self):
+        # A telemetry port already in use should surface as the bridge's error, proving --telemetry-port
+        # was threaded through to the capture's bind() rather than the GT7 default being used instead.
+        taken = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        taken.bind(("0.0.0.0", 0))
+        busy_port = taken.getsockname()[1]
+        try:
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                code = main(["--fake-console", "--port", "0", "--telemetry-port", str(busy_port)])
+            self.assertEqual(code, 1)
+            self.assertIn("error", err.getvalue().lower())
+        finally:
+            taken.close()
+
 
 class BridgeEndToEndTest(unittest.TestCase):
     """The whole bridge: fake console, capture, frame conversion, and a real WebSocket client."""
