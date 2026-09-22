@@ -16,7 +16,7 @@ Tracks what's actually been built, in order, as this plan is implemented.
 
 **Scope of the first pass:** the "Everything" layout as a fixed grid, with the Timing widgets plus speed, gear, rpm and pedals; frames extended to carry those channels; the bridge forwarding frames over a WebSocket and serving `web/`; a live source with the setup panel and connection states. **Not in it:** presets switching, edit mode and the Custom layout, steering (its own session), driver aids and boost (not wanted, [D19](DECISIONS.md)), tyres, fuel, track map, the Review view, the phone layout.
 
-**Status:** steps 1–5 complete; step 6 half done: it has run against a real PS4 from a Mac browser and (per the user) a phone browser, and works well; the iPad specifically is still to try. `npm test` (34) and `npm run test:bridge` (55) pass.
+**Status:** steps 1–5 complete; step 6 half done: it has run against a real PS4 from a Mac browser and (per the user) a phone browser, and works well; the iPad specifically is still to try. `npm test` (54) and `npm run test:bridge` (69) pass.
 
 1. **Frame format and demo data** (step 1). Added `suggestedGear`, `rpmWarning`, `rpmLimiter` and `totalLaps` (optional) to the frame format, the demo generator and `DemoSource`; documented in the README. The generator now compares the stored (rounded) rpm against the warning level, after a test caught them disagreeing.
 2. **Bridge** (step 2). `bridge/bridge.py` runs the console capture, converts each packet to a frame (`frames.py`), and broadcasts it over a WebSocket. `ws_server.py` is a standard-library HTTP and WebSocket server on one port: it serves `web/`, answers `/bridge.json`, and upgrades `/ws`. `--fake-console` tries the whole path with no PS4. Diverged from the plan: the WebSocket server is hand-written rather than a `websockets` dependency, so the bridge still needs nothing installed.
@@ -27,6 +27,7 @@ Tracks what's actually been built, in order, as this plan is implemented.
 7. **Lap numbers.** The lap table uses the game's lap numbers, which differ from the tracker's own count when joining mid-session.
 8. **Second real PS4 session: three clean unpaused laps.** Confirmed the live delta tracks the game's own lap-time differences closely (the user measured about 4 ms) and that consecutive laps' own times matched the game's within about 20 ms. Found and fixed a subtler issue: the sample marking a lap boundary was placed by interpolating position, which is unreliable right at the start/finish line where the car's path can cross itself; when both sides of the boundary are on the trusted game clock, it is now pinned to the exact game lap time instead ([O14](DECISIONS.md) follow-up). Committed that second session as a test fixture (`bridge/tests/fixtures/gt7-ps4-session.jsonl.gz`), replayed by both test suites; it turned out to also contain a session restart and a pause, so it covers more of Known issue 5 than expected. Added `GT7_TELEMETRY.md`'s "At a glance" table (every field the decoder gives, and whether the dashboard uses it yet), linked from the README.
 9. **First real PS4 session (step 6, in part).** Everything responded. A recorded session showed that arrival-time timestamps made the delta wobble (std 4.3 ms, spikes to 100 ms) and drift from the game's time (a lap timed 384 ms off). The bridge now stamps frames with the game's own clock when it can be trusted (`GameClock`, [O14](DECISIONS.md)): delta noise 0.3 ms, spikes under 6 ms, lap timed to 9 ms. Also fixed after the first attempt failed: a crash when the record folder didn't exist, which the bridge had swallowed ([BUG-1](BUGS.md)).
+10. **Reverse gear** ([D21](DECISIONS.md)). The user noticed the Gear widget never showed reverse. A dedicated real-PS4 capture (drive, stop, reverse back the same way, stop) showed the gear byte reads 0 throughout reverse, identical to neutral — GT7 gives no separate signal for it. The bridge now infers reverse from `velocity` opposing the heading derived from `rotation`'s yaw (`_is_reversing` in `bridge/frames.py`); the frame's `gear` is -1 and the widget shows "R". Committed the capture as a test fixture (`bridge/tests/fixtures/gt7-ps4-reverse.jsonl.gz`, replayed by `bridge/tests/test_real_reverse.py`).
 
 ## 1. Grid and layout
 
@@ -82,7 +83,7 @@ Availability is against what GT7's type-A packet gives ([`GT7_TELEMETRY.md`](GT7
 |---|---|---|
 | Current lap, Delta, Predicted, Last, Best, Sectors, Delta chart, Lap table | The lap tracker (`web/timing.js`) | Works from position and lap counter |
 | Speed | `speed` | Type A |
-| Gear | `gear`, `suggested_gear` | Type A. How neutral and reverse are encoded is unconfirmed |
+| Gear | `gear`, `suggested_gear` | Type A. Reverse is inferred, not decoded directly ([D21](DECISIONS.md)) |
 | RPM | `rpm`, `rpm_warning`, `rpm_limiter` | Type A |
 | Pedals | `throttle`, `brake` | Type A |
 
@@ -139,7 +140,7 @@ PS4 --UDP--> bridge --WebSocket--> page (served by the bridge over http, or the 
 
 ## Flagged open questions
 
-- How does GT7 encode neutral and reverse in the gear field? The wireframe shows "N".
+- ~~How does GT7 encode neutral and reverse in the gear field? The wireframe shows "N".~~ **Resolved** ([D21](DECISIONS.md)): it doesn't — the gear byte reads 0 (neutral) throughout reverse too. The frame's `gear` is -1 in reverse, inferred from velocity opposing heading; the widget shows "R".
 - Pedal colours: throttle blue and brake amber. Check they read well next to the delta's green and red once seen on the iPad.
 - Whether `onTrack` (flag bit 0) really means what the parser docs say. If GT7 clears it in some modes, timing would be held throughout; the page shows why, so it will be visible on first contact.
 - Hand-rolled or library grid for edit mode: [O13](DECISIONS.md).

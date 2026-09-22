@@ -5,10 +5,34 @@ knowledge of GT7's units and quirks stays in this bridge. Another game would get
 and its own function like `to_frame`.
 """
 import collections
+import math
 
 from gt7 import decode_flags
 
 NO_SUGGESTED_GEAR = 15   # the high nibble of the gear byte is 15 when the game has no suggestion
+
+# GT7's gear byte reads 0 (its neutral value) throughout reverse too (confirmed on a real PS4
+# session, 2026-09-22, D21): the game gives no separate signal for reverse, so it has to be
+# inferred from the car's velocity opposing its heading instead.
+REVERSE_MIN_SPEED_MS = 0.5    # below this, direction is too noisy (GPS-like jitter) to judge
+REVERSE_COS_THRESHOLD = 0.5   # velocity more than ~60 degrees off the nose counts as reverse
+
+
+def _is_reversing(decoded):
+    """Infer reverse from the car moving opposite to where it's pointed, since GT7's gear byte can't.
+
+    `rotation`'s yaw and `velocity`'s x/z give a heading unit vector and a ground-plane velocity;
+    their dot product, normalised by speed, is the cosine of the angle between them. Driving forward
+    it sits close to -1 in this axis convention (confirmed on real data); reversing flips it toward
+    +1. Below `REVERSE_MIN_SPEED_MS` the angle is meaningless, so a stationary car reads as neutral.
+    """
+    vx, _, vz = decoded["velocity"]
+    speed = math.hypot(vx, vz)
+    if speed < REVERSE_MIN_SPEED_MS:
+        return False
+    yaw = decoded["rotation"][1]
+    heading_dot = vx * math.sin(yaw) + vz * math.cos(yaw)
+    return heading_dot / speed > REVERSE_COS_THRESHOLD
 
 
 class GameClock:
@@ -92,11 +116,12 @@ def to_frame(decoded, t_ms):
     plane (y is height). `lastLap` is only included when the game reports one (it is -1 before the
     first lap). The flags become `paused`, `loading` and `onTrack`, which the lap tracker uses to
     hold timing. `totalLaps` is left out for now because its offset in the packet is unconfirmed.
+    `gear` is -1 in reverse, inferred per `_is_reversing` since GT7 doesn't signal it directly.
 
     `t_ms` comes from a `GameClock`, which prefers the game's own clock to arrival times.
     """
     flags = decode_flags(decoded["flags"])
-    gear = decoded["gear"]
+    gear = -1 if decoded["gear"] == 0 and _is_reversing(decoded) else decoded["gear"]
     suggested = decoded["suggested_gear"]
     frame = {
         "t": round(t_ms, 3),
