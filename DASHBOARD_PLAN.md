@@ -39,6 +39,11 @@ Tracks what's actually been built, in order, as this plan is implemented.
     - **Pedals layout shift, fixed.** `.pedal-pct` had no fixed width, so "100%" (three digits) was wider than "0%"/"78%", nudging the whole row's `justify-content: space-around` spacing whenever a pedal hit full. Gave it a fixed, cqh/cqw-scaled width in the vertical layout too (the horizontal one already had this).
     - **Tyres, resized.** The user's adjusted design fills more of the box (~60%) with tighter gaps between the four corners; updated the `.tyre`/`.caliper`/`.tyre-temp` clamp() formulas and `.tyre-grid`'s gap to match.
     - **RPM gained two more variants**, `segmented` (2e: number + a lit-segment bar in one row, instead of a continuous fill) and `barOnly` (2f: the segmented bar alone, no number) - both reuse the existing `.rpm-lights` markup already built for the `lights` variant, just placed inline instead of in its own row. Five RPM variants now: Compact, Bar, Segmented, Bar Only, Shift Lights. `npm test` (76) passes.
+16. **RPM and Gear merged into one widget, `rpmGear`** ([D28](DECISIONS.md)), from the "RPM + Gear (combined)" section added to `design/Widget Responsive Behavior.dc.html`. The standalone RPM and Gear entries are gone from `WIDGET_META`, the palette and both built-in presets that used them (Everything, Driving); `rpmGear` takes three variants (D27-style, chosen explicitly, not by size):
+    - **stacked** (default): the gear digit + suggested-gear hint, a "RPM 1234" label row, and the 12-segment shift-light bar, stacked top to bottom. This is the shape the user picked from the first round of mockups.
+    - **column**: an edge-to-edge gear digit beside a vertical 12-segment shift-light column, no numeric rpm readout - for a small/square slot where the digit should dominate.
+    - **ring**: the gear digit centred over a circular shift-light "ring" (an SVG arc, 270° sweep open at the bottom) that fills clockwise as rpm rises, coloured by zone the same as the bar/lights; no numeric rpm readout either. The arc's dash length comes from the live path's own `getTotalLength()` rather than a hand-computed constant.
+    All three reuse the same built DOM (`web/widgets.js`'s `rpmGear`), shown/hidden and rearranged per `[data-variant]` in `web/style.css`, matching the D27 pattern. `web/dom.js` gained a small `svgEl` helper for the ring's namespaced SVG elements (and a reminder that SVG elements don't support plain `.className =` assignment - the ring's class updates go through `setAttribute('class', …)` instead). `minW`/`minH` are 2×2 for all three variants; the Everything and Driving presets were reshaped to give the merged widget the combined footprint the old RPM bar + Gear card used between them. Checked in a browser: all three variants render and update live against the demo source, the variant `<select>` in edit-mode chrome switches between them, and the phone/tablet layout (`.w-rpmGear` replacing `.w-gear/.w-rpm`) shows no overflow at 375×812. `npm test` (76) passes.
 
 ## 1. Grid and layout
 
@@ -176,7 +181,7 @@ Per-widget chrome while editing:
 - **Remove button** (top-right, ×, red-tinted).
 - **Four corner resize handles**, dashed squares just outside each corner.
 - **Size tag** (bottom-left), e.g. "3×2", showing the widget's current cell span.
-- **Variant select** (top-centre), only for widgets with more than one shape (RPM, Pedals): switches the widget's shape explicitly, independent of its size ([D27](DECISIONS.md); §8 note below).
+- **Variant select** (top-centre), only for widgets with more than one shape (RPM + Gear, Pedals): switches the widget's shape explicitly, independent of its size ([D27](DECISIONS.md); §8 note below).
 - Non-dragged widgets get a dashed border instead of the normal solid one, to read as "editable" without competing with the dragged widget.
 
 Drag interaction:
@@ -187,7 +192,7 @@ Drag interaction:
 
 Resize interaction: dragging a corner handle grows/shrinks the widget by whole cells from that corner, with the same collision check as drag (red ghost/tint, snaps back if invalid). Each widget declares a minimum size in its registry entry (the widget registry is `CLAUDE.md`'s "Dashboard elements are widgets" convention); resize can't go below it.
 
-Palette drawer: opens over the right edge of the grid (300px wide, on top — widgets underneath are still visible/dimmed, not reflowed) when adding a widget, grouped **Timing** (Current lap, Delta, Sectors, Delta chart, Speed chart, Last/Best/Predicted, Lap table) and **Driving** (Gear, Speed, RPM, Pedals) — every widget built in section 1, plus Speed chart. A disabled **Coming later** group (Tyres, Fuel, Track map, greyed at 45% opacity with a "SOON" pill, not draggable) covers widgets that don't exist yet; Steering, driver aids and Boost belong there too once any of them ships, per the 8.1 note above, not before. Each entry shows a size swatch, name and cell-size tag (e.g. "6×3" for Lap Table — larger than its 4×4 default in the fixed grid, room for more rows). Dragging an entry from the palette onto the grid works like moving an existing widget: ghost preview, red invalid-drop state, snap on release.
+Palette drawer: opens over the right edge of the grid (300px wide, on top — widgets underneath are still visible/dimmed, not reflowed) when adding a widget, grouped **Timing** (Current lap, Delta, Sectors, Delta chart, Speed chart, Last/Best/Predicted, Lap table) and **Driving** (RPM + Gear, Speed, Pedals) — every widget built in section 1, plus Speed chart, with RPM and Gear now the one merged widget ([D28](DECISIONS.md), log 16). A disabled **Coming later** group (Tyres, Fuel, Track map, greyed at 45% opacity with a "SOON" pill, not draggable) covers widgets that don't exist yet; Steering, driver aids and Boost belong there too once any of them ships, per the 8.1 note above, not before. Each entry shows a size swatch, name and cell-size tag (e.g. "6×3" for Lap Table — larger than its 4×4 default in the fixed grid, room for more rows). Dragging an entry from the palette onto the grid works like moving an existing widget: ghost preview, red invalid-drop state, snap on release.
 
 ### 8.3 Phone layout
 
@@ -195,7 +200,7 @@ No edit mode on phone — presets and Custom (as built on a wider screen) collap
 
 1. Delta
 2. Current lap
-3. Gear / Speed / RPM cluster (Gear and Speed side by side, ~130px + flex; RPM full-width below as a labelled bar)
+3. RPM + Gear / Speed cluster, side by side, ~half-width each (the merged widget absorbed the old "RPM full-width below" row, [D28](DECISIONS.md))
 4. Sectors (three columns in one card, same as desktop's per-sector layout)
 5. Last lap / Best lap (side by side)
 6. Predicted
@@ -204,7 +209,7 @@ No edit mode on phone — presets and Custom (as built on a wider screen) collap
 
 The wireframe continues with Steering, driver aids and Boost below Pedals; dropped here for the same reason as 8.1 — they aren't built. Add them to the end of this order if any of them ships.
 
-At 390×844, items 1–5 fit above the fold; the rest needs a scroll. Landscape phone (844×390) is a simplified fallback, not the full stack: just the top-priority cluster (Delta, Current lap, Sectors in a row; Gear, Speed, RPM in a second row) — the rest is reachable by rotating back to portrait, not by scrolling landscape.
+At 390×844, items 1–5 fit above the fold; the rest needs a scroll. Landscape phone (844×390) is a simplified fallback, not the full stack: just the top-priority cluster (Delta, Current lap, Sectors in a row; RPM + Gear, Speed in a second row) — the rest is reachable by rotating back to portrait, not by scrolling landscape.
 
 This mapping is a fixed, hard-coded phone layout, not a fourth breakpoint of the grid — the widget registry doesn't need per-widget phone positions, only this priority order, since the grid's column/row spans stop applying below the grid's minimum usable width.
 
