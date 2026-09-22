@@ -41,6 +41,8 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 
 **Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
 
+**Real-session fixture.** `bridge/tests/fixtures/gt7-ps4-session.jsonl.gz` is a real PS4 recording, replayed by `bridge/tests/test_real_session.py` and (via a cached decode, `npm run decode-fixture`) `tests/real-session.test.mjs`. Regenerate the cache after changing the decoder or the frame format.
+
 **Demo data is synthetic** and must stay labelled as such on the page. Regenerate `web/demo-laps.json` with `npm run demo-data`; commit the result.
 
 **Definition of done:**
