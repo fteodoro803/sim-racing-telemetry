@@ -20,17 +20,18 @@ const LOST_REFERENCE_RESET_MS = 5000; // this long continuously off the referenc
 export const DEFAULT_SPLITS = [1 / 3, 2 / 3];
 
 /**
- * Look up the time (ms into the lap) at which a lap reached a given progress.
+ * Look up a lap channel's value at a given progress, by binary search on its (progress, value) samples.
  *
- * Binary-searches the lap's (progress, time) samples and interpolates linearly between the
- * two either side. Clamps to the first or last sample when `p` is outside the lap, and returns
- * null for a lap with no samples. Progress must be non-decreasing, which the tracker guarantees.
+ * Interpolates linearly between the two samples either side of `p`. Clamps to the first or last
+ * sample when `p` is outside the lap, and returns null for a lap with no samples. Progress must be
+ * non-decreasing, which the tracker guarantees. `key` is any per-sample channel a lap stores (`t`
+ * for time, `speed`, ...) alongside its `p` (progress) array.
  */
-export function timeAt(lap, p) {
-  const ps = lap.p, ts = lap.t, n = ps.length;
+function valueAt(lap, p, key) {
+  const ps = lap.p, vs = lap[key], n = ps.length;
   if (n === 0) return null;
-  if (p <= ps[0]) return ts[0];
-  if (p >= ps[n - 1]) return ts[n - 1];
+  if (p <= ps[0]) return vs[0];
+  if (p >= ps[n - 1]) return vs[n - 1];
   let lo = 0, hi = n - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
@@ -38,7 +39,12 @@ export function timeAt(lap, p) {
   }
   const span = ps[hi] - ps[lo];
   const u = span > 1e-9 ? (p - ps[lo]) / span : 0;
-  return ts[lo] + u * (ts[hi] - ts[lo]);
+  return vs[lo] + u * (vs[hi] - vs[lo]);
+}
+
+/** Time (ms into the lap) at which `lap` reached progress `p`. See `valueAt`. */
+export function timeAt(lap, p) {
+  return valueAt(lap, p, 't');
 }
 
 /**
@@ -156,6 +162,7 @@ export class LapTracker {
     this.prev = null;
     this.live = null;
     this._deltaCache = null;
+    this._speedCache = null;
     this._bestSectorsCache = null;
   }
 
@@ -197,6 +204,7 @@ export class LapTracker {
   setCompareMode(mode) {
     this.compareMode = mode;
     this._deltaCache = null;
+    this._speedCache = null;
   }
 
   /** The split points in metres along the reference line (empty until there is a reference). */
@@ -313,6 +321,27 @@ export class LapTracker {
     for (let i = c.p.length; i < cur.p.length; i++) {
       c.p.push(cur.p[i]);
       c.d.push(cur.t[i] - timeAt(cmp, cur.p[i]));
+    }
+    return c;
+  }
+
+  /**
+   * Speed (km/h) at every sample of the current lap, alongside the comparison lap's speed at the
+   * same position, for the speed-over-lap chart.
+   *
+   * Same shape and caching approach as `deltaSeries`. `theirs[i]` is the comparison lap's speed
+   * interpolated to `p[i]`, so the two series can be drawn against one shared position axis.
+   */
+  speedSeries() {
+    const cmp = this.compareLap();
+    const cur = this.cur;
+    if (!cur || !cmp || !this.ref || !cur.recording) return null;
+    let c = this._speedCache;
+    if (!c || c.cur !== cur || c.cmp !== cmp) c = this._speedCache = { cur, cmp, p: [], mine: [], theirs: [] };
+    for (let i = c.p.length; i < cur.p.length; i++) {
+      c.p.push(cur.p[i]);
+      c.mine.push(cur.speed[i]);
+      c.theirs.push(valueAt(cmp, cur.p[i], 'speed'));
     }
     return c;
   }

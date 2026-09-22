@@ -21,13 +21,14 @@ for each. A worked real example (values from an actual PS4 packet) is in the REA
 | `rpm_warning`, `rpm_limiter` | shift-alert and limiter rpm | **in use** (RPM widget's markers) |
 | `estimated_top_speed` | top speed in current gearing | decoded, unused |
 | `gear`, `suggested_gear` | current gear (0 = neutral or reverse, ambiguous), suggested gear (15 = none) | **in use** (Gear widget). Reverse isn't in this byte at all — the frame's `gear` is -1 when `velocity` opposes `rotation`'s heading (confirmed on a real PS4, D21) |
-| `clutch`, `clutch_engagement` | 0–1 | decoded, unused |
+| `clutch` | 0–1 | **in use** (Pedals widget) |
+| `clutch_engagement` | 0–1 | decoded, unused |
 | `gear_ratios` (×8), `transmission_top_speed` | gearbox detail | decoded, unused |
 | `throttle`, `brake` | pedals, 0–255 | **in use** (Pedals widget) |
 | `boost` | turbo boost | decoded, unconfirmed (see below), unused |
 | `fuel_level`, `fuel_capacity` | litres | decoded, unused (fuel widget is later, [D19](DECISIONS.md)) |
 | `oil_pressure`, `water_temp`, `oil_temp` | the last two are fixed constants, so carry no information | decoded, unused |
-| `tyre_temp` (×4) | surface temperature, °C | decoded, unused (tyre-colour pass is its own dedicated pass, [D12](DECISIONS.md)) |
+| `tyre_temp` (×4) | surface temperature, °C | **in use** (Tyres widget). Colour thresholds are a placeholder - GT7 gives no ideal range ([D12](DECISIONS.md)) |
 | `wheel_rps`, `tyre_radius`, `suspension_height` (×4 each) | wheel speed, radius, suspension travel | decoded, unused |
 | `lap` | the lap counter | **in use** (drives all lap/sector timing) |
 | `best_lap`, `last_lap` | ms, −1 if none | `last_lap` **in use**; `best_lap` unused (the tracker computes its own) |
@@ -123,7 +124,7 @@ Not confirmed by that implementation but in the parser docs: `totalLaps` (probab
 | `speed` | float, m/s | Convert to km/h | v1 (in the frame) |
 | `throttle` | uint8, 0–255 | Scale to 0–100 | v1 (in the frame) |
 | `brake` | uint8, 0–255 | Scale to 0–100 | v1 (in the frame) |
-| `clutch` | float, 0–1 | | later |
+| `clutch` | float, 0–1 | Scale to 0–100, like throttle and brake | v1 (in the frame; Pedals widget) |
 | `clutchEngagement` | float, 0–1 | | later |
 | `gears` | uint8 | Low 4 bits: current gear. High 4 bits: suggested gear (15 means none) | v1 (current gear in the frame; suggested gear v1) |
 | `engineRPM` | float, rpm | | v1 (in the frame) |
@@ -166,7 +167,7 @@ Not confirmed by that implementation but in the parser docs: `totalLaps` (probab
 
 | Field | Type / unit | Notes | In this project |
 |---|---|---|---|
-| `tyreTemp[4]` | float, degrees C | Surface temperature. Order FL, FR, RL, RR. No ideal range is given | tyres pass: tyre graphics that change colour, no labels ([D12](DECISIONS.md)) |
+| `tyreTemp[4]` | float, degrees C | Surface temperature. Order FL, FR, RL, RR. No ideal range is given | v1 (in the frame; Tyres widget, colour + a number, [D12](DECISIONS.md)) |
 | `wheelRPS[4]` | float, rad/s | With `tyreRadius` and `speed` gives slip, so lockup and wheelspin | later |
 | `tyreRadius[4]` | float, m | | later |
 | `suspHeight[4]` | float, m | Suspension travel per corner | later |

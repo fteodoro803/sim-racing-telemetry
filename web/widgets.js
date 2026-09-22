@@ -10,6 +10,7 @@
 import { drawChart } from './charts.js';
 import { deltaClass, el, setClass, setText } from './dom.js';
 import { fmtDelta, fmtLap, fmtSector } from './format.js';
+import { tyreZone } from './tyre-color.js';
 
 const NBSP = ' ';
 const DASH = '—';
@@ -134,6 +135,40 @@ const deltaChart = {
   },
 };
 
+const speedChart = {
+  title: 'Speed over lap',
+  build(body) {
+    const legend = el('div', 'chart-legend');
+    legend.append(
+      el('span', 'legend-item cur', 'this lap'),
+      el('span', 'legend-item ref', 'best lap'),
+    );
+    const canvas = el('canvas');
+    body.closest('.widget').classList.add('has-chart');
+    body.append(legend, canvas);
+    return { canvas, key: '' };
+  },
+  update(r, { tracker, theme }) {
+    const ds = tracker.speedSeries();
+    const count = ds ? ds.p.length : 0;
+    const key = `${count}|${r.canvas.clientWidth}x${r.canvas.clientHeight}|${tracker.compareMode}|${tracker.cur?.n}`;
+    if (key === r.key) return;
+    r.key = key;
+    const xMax = tracker.ref ? tracker.ref.length : 1000;
+    const seen = ds ? ds.mine.concat(ds.theirs.filter((v) => v != null)) : [];
+    const yMax = Math.max(20, ...seen) * 1.05;
+    drawChart(r.canvas, ds ? [
+      { x: ds.p, y: ds.theirs, color: theme.reference, width: 2, dash: [3, 4] },
+      { x: ds.p, y: ds.mine, color: theme.current, width: 2 },
+    ] : [], {
+      theme, xMax, yMin: 0, yMax, vlines: tracker.splitsM(),
+      xFormat: (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)} km` : `${Math.round(v)} m`),
+      yFormat: (v) => String(Math.round(v)),
+      marker: ds && ds.mine.length ? { x: ds.p[ds.p.length - 1], y: ds.mine[ds.mine.length - 1], color: theme.current } : null,
+    });
+  },
+};
+
 const lastLap = {
   title: 'Last lap',
   build(body) {
@@ -218,39 +253,53 @@ const lapTable = {
 
 // ---- Driving -------------------------------------------------------------------------------
 
+const RPM_LIGHTS = 12;   // shift-light segments shown once the widget is tall enough (design/Widget Responsive Behavior.dc.html, 2d)
+
 const rpm = {
   title: 'RPM',
-  noLabel: true,   // the label sits inline with the value and the bar
+  noLabel: true,   // the label sits inline with the value; layout (and whether the bar/lights show) is CSS, by container size
   build(body) {
     const row = el('div', 'rpm-row');
-    const label = el('div', 'w-label', 'RPM');
+    const label = el('div', 'w-label rpm-label', 'RPM');
     const value = el('div', 'v v-md accent rpm-value');
     const track = el('div', 'rpm-track');
     const fill = el('div', 'rpm-fill');
     const warn = el('div', 'rpm-mark');
     const limit = el('div', 'rpm-mark limit');
     track.append(fill, warn, limit);
-    row.append(label, value, track);
+    const lights = el('div', 'rpm-lights');
+    for (let i = 0; i < RPM_LIGHTS; i++) lights.append(el('div', 'rpm-light'));
+    row.append(label, value, track, lights);
     body.append(row);
-    return { value, fill, warn, limit };
+    return { value, fill, warn, limit, lights: Array.from(lights.children) };
   },
   update(r, { frame }) {
     if (!frame || frame.rpm == null) {
       setText(r.value, DASH);
       r.fill.style.width = '0%';
+      for (const light of r.lights) setClass(light, 'rpm-light');
       return;
     }
     const limiter = frame.rpmLimiter > 0 ? frame.rpmLimiter : 9000;
+    const warnRpm = frame.rpmWarning > 0 ? frame.rpmWarning : limiter;
     const max = limiter * 1.08;
     // `revLimitAlert` is the game's own "actively bouncing off the limiter" bit; fall back to the
     // rpm/limiter threshold for cars or frames where that bit hasn't been confirmed reliable.
     const atLimit = frame.revLimitAlert || frame.rpm >= limiter * 0.98;
-    const level = atLimit ? 'limit' : frame.rpmWarning > 0 && frame.rpm >= frame.rpmWarning ? 'warn' : '';
+    const level = atLimit ? 'limit' : frame.rpm >= warnRpm ? 'warn' : '';
     setText(r.value, String(Math.round(frame.rpm)));
     setClass(r.fill, `rpm-fill ${level} ${frame.revLimitAlert ? 'flash' : ''}`);
     r.fill.style.width = `${Math.min(100, (frame.rpm / max) * 100).toFixed(1)}%`;
     r.warn.style.left = frame.rpmWarning > 0 ? `${((frame.rpmWarning / max) * 100).toFixed(1)}%` : '-10%';
     r.limit.style.left = `${((limiter / max) * 100).toFixed(1)}%`;
+    // Each segment represents an equal slice of the same 0..max range as the bar; it lights up once
+    // the rpm reaches its slice, in whichever zone (normal/warn/limit) that slice falls in.
+    r.lights.forEach((light, i) => {
+      const segStart = (i / RPM_LIGHTS) * max;
+      const lit = frame.rpm >= segStart;
+      const zone = segStart >= limiter * 0.98 ? 'limit' : segStart >= warnRpm ? 'warn' : '';
+      setClass(light, `rpm-light ${lit ? 'lit' : ''} ${zone}`);
+    });
   },
 };
 
@@ -292,12 +341,17 @@ const speed = {
   },
 };
 
-/** One vertical pedal bar: a percentage above, the bar, and a short name below. */
-function makePedal(name, fillClass) {
-  const node = el('div', 'pedal');
-  const pct = el('div', 'pedal-pct');
+/**
+ * One pedal: a percentage, a bar and a short name, in whichever order/orientation the CSS puts
+ * them (vertical bars by default, horizontal once the widget is too short for a tall bar to read -
+ * see the container queries in style.css). The bar's fill is a CSS custom property, `--fill`, so
+ * the same value drives its height in the vertical layout and its width in the horizontal one.
+ */
+function makePedal(name, kind) {
+  const node = el('div', `pedal ${kind}`);
+  const pct = el('div', `pedal-pct ${kind}`);
   const track = el('div', 'pedal-track');
-  const fill = el('div', `pedal-fill ${fillClass}`);
+  const fill = el('div', `pedal-fill ${kind}`);
   track.append(fill);
   node.append(pct, track, el('div', 'pedal-name', name));
   return { node, pct, fill };
@@ -307,23 +361,68 @@ const pedals = {
   title: 'Pedals',
   build(body) {
     const row = el('div', 'pedal-row');
-    const thr = makePedal('THR', 'throttle');
+    const clu = makePedal('CLU', 'clutch');
     const brk = makePedal('BRK', 'brake');
-    row.append(thr.node, brk.node);
+    const thr = makePedal('THR', 'throttle');
+    row.append(clu.node, brk.node, thr.node);
     body.append(row);
-    return { thr, brk };
+    return { clu, brk, thr };
   },
   update(r, { frame }) {
-    for (const [pedal, value] of [[r.thr, frame?.throttle], [r.brk, frame?.brake]]) {
+    for (const [pedal, value] of [[r.clu, frame?.clutch], [r.brk, frame?.brake], [r.thr, frame?.throttle]]) {
       const v = value == null ? 0 : Math.max(0, Math.min(100, value));
       setText(pedal.pct, value == null ? DASH : `${Math.round(v)}%`);
-      pedal.fill.style.height = `${Math.max(v, 2).toFixed(1)}%`;
-      setClass(pedal.fill, `pedal-fill ${pedal === r.thr ? 'throttle' : 'brake'}${v < 3 ? ' idle' : ''}`);
+      pedal.fill.style.setProperty('--fill', `${Math.max(v, 2).toFixed(1)}%`);
+      pedal.fill.classList.toggle('idle', v < 3);
     }
   },
 };
 
+// Colour per temperature zone (D26 in DECISIONS.md; thresholds in tyre-color.js).
+const ZONE_COLOR = { cold: 'var(--accent)', optimal: 'var(--good)', hot: 'var(--amber)', overheating: 'var(--bad)' };
+
+/**
+ * One corner's tyre + brake caliper (design/Widget Responsive Behavior.dc.html, 1a/1b). `mirrored`
+ * puts the caliper on the other side, so the right-side corners' calipers face the car's centreline
+ * like the left-side ones - a CSS class, not a different DOM order.
+ */
+function makeTyreCorner(mirrored) {
+  const node = el('div', `tyre-corner${mirrored ? ' mirrored' : ''}`);
+  const tyre = el('div', 'tyre');
+  const temp = el('div', 'tyre-temp');
+  tyre.append(temp);
+  const caliper = el('div', 'caliper');
+  node.append(tyre, caliper);
+  return { node, tyre, temp, caliper };
+}
+
+const tyres = {
+  title: 'Tyres',
+  build(body) {
+    const grid = el('div', 'tyre-grid');
+    const fl = makeTyreCorner(false);
+    const fr = makeTyreCorner(true);
+    const rl = makeTyreCorner(false);
+    const rr = makeTyreCorner(true);
+    grid.append(fl.node, fr.node, rl.node, rr.node);
+    body.append(grid);
+    return { corners: [fl, fr, rl, rr] };   // order matches tyreTemp: FL, FR, RL, RR
+  },
+  update(r, { frame }) {
+    const temps = frame?.tyreTemp;
+    r.corners.forEach((c, i) => {
+      const t = temps ? temps[i] : null;
+      const zone = tyreZone(t);
+      const color = zone ? ZONE_COLOR[zone] : 'var(--line)';
+      c.tyre.style.background = color;
+      c.caliper.style.background = color;
+      setText(c.temp, t == null ? DASH : `${Math.round(t)}°`);
+      setClass(c.temp, `tyre-temp${zone ? '' : ' dim'}`);
+    });
+  },
+};
+
 export const WIDGETS = {
-  currentLap, delta, sectors, deltaChart, lastLap, bestLap, predicted, lapTable,
-  rpm, gear, speed, pedals,
+  currentLap, delta, sectors, deltaChart, speedChart, lastLap, bestLap, predicted, lapTable,
+  rpm, gear, speed, pedals, tyres,
 };

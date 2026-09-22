@@ -77,13 +77,17 @@ export function drawChart(canvas, series, opts) {
   ctx.clearRect(0, 0, w, h);
 
   const th = opts.theme;
-  const pad = { l: 46, r: 10, t: 8, b: 20 };
+  // Text and the padding it needs scale with the canvas's own size, the same as the CSS around it
+  // (style.css's container-query rules), so a chart shrunk or grown in edit mode stays legible
+  // and doesn't waste space on axis labels sized for a bigger widget.
+  const fontPx = Math.max(9, Math.min(h * 0.09, w * 0.035, 14));
+  const pad = { l: fontPx * 4.2, r: 10, t: 8, b: fontPx * 1.8 };
   const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
   const { xMax, yMin, yMax } = opts;
   const sx = (x) => pad.l + (x / xMax) * pw;
   const sy = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * ph;
 
-  ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+  ctx.font = `${fontPx}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
   ctx.textBaseline = 'middle';
 
   // 2. Horizontal grid lines and y-axis labels

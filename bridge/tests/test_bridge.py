@@ -38,15 +38,17 @@ class FrameConversionTest(unittest.TestCase):
         self.assertEqual((f["rpmWarning"], f["rpmLimiter"]), (7000, 8200))
         self.assertLessEqual(f["throttle"], 100)
         self.assertLessEqual(f["brake"], 100)
+        self.assertEqual(f["clutch"], 0.0)   # the fake console doesn't model the clutch pedal
+        self.assertEqual(f["tyreTemp"], [80.0, 82.0, 78.0, 79.0])   # FL, FR, RL, RR, from the fake console
         self.assertEqual(f["lastLap"], 20000)
         # x and z are the ground plane; y (height) is not part of a frame
         self.assertNotIn("y", f)
         self.assertAlmostEqual(f["x"] ** 2 + f["z"] ** 2, 200.0 ** 2, delta=1.0)
 
     def test_pedals_scale_to_percent(self):
-        d = dict(self.decoded, throttle=255, brake=0)
+        d = dict(self.decoded, throttle=255, brake=0, clutch=0.5)
         f = to_frame(d, 0)
-        self.assertEqual((f["throttle"], f["brake"]), (100.0, 0.0))
+        self.assertEqual((f["throttle"], f["brake"], f["clutch"]), (100.0, 0.0, 50.0))
 
     def test_last_lap_is_left_out_until_there_is_one(self):
         self.assertNotIn("lastLap", to_frame(dict(self.decoded, last_lap=-1), 0))

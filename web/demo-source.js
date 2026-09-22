@@ -2,6 +2,16 @@
 // Uses a virtual clock so playback speed can change without touching frame timestamps.
 
 /**
+ * A plausible FL/FR/RL/RR tyre temperature (°C) for a given speed: not modeled physics, just
+ * something that visibly varies with the demo lap so the Tyres widget has something to show,
+ * front slightly hotter than rear under load at speed.
+ */
+function tyreTempAt(speedKmh) {
+  const base = 65 + Math.min(35, speedKmh * 0.15);
+  return [base + 4, base + 3, base - 2, base - 3];
+}
+
+/**
  * A frame source backed by demo-laps.json; the same interface a live source would have.
  *
  * Frames are built on demand from the columnar data. `advance` releases them against a virtual
@@ -39,7 +49,8 @@ export class DemoSource {
       t: i * this.dt,
       lap: this.lapAt[i],
       x: d.x[i], z: d.z[i],
-      speed: d.speed[i], throttle: d.throttle[i], brake: d.brake[i],
+      speed: d.speed[i], throttle: d.throttle[i], brake: d.brake[i], clutch: 0,   // not modeled, same as the fake console
+      tyreTemp: tyreTempAt(d.speed[i]),
       gear: d.gear[i], suggestedGear: d.suggestedGear[i], rpm: d.rpm[i],
       rpmWarning: d.rpmWarning, rpmLimiter: d.rpmLimiter,
       // The demo data has no recorded flags byte, so approximate the game's own alert bit from rpm.

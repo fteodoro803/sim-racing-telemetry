@@ -112,13 +112,15 @@ def make_frame(decoded, clock, arrival_ms):
 def to_frame(decoded, t_ms):
     """Turn one decoded type-A packet into a frame, stamped `t_ms` milliseconds after the bridge started.
 
-    Speed goes from m/s to km/h and the pedals from 0-255 to 0-100. Position is x and z, the ground
-    plane (y is height). `lastLap` is only included when the game reports one (it is -1 before the
-    first lap). The flags become `paused`, `loading` and `onTrack`, which the lap tracker uses to
-    hold timing, plus `revLimitAlert` (the game's own "bouncing off the limiter" bit, separate from
-    the static `rpmLimiter` threshold). `totalLaps` is left out for now because its offset in the
-    packet is unconfirmed.
-    `gear` is -1 in reverse, inferred per `_is_reversing` since GT7 doesn't signal it directly.
+    Speed goes from m/s to km/h and the pedals (throttle, brake, clutch) from their raw scale to
+    0-100. Position is x and z, the ground plane (y is height). `tyreTemp` is FL, FR, RL, RR surface
+    temperature in degrees C, straight from the packet (GT7 gives no ideal range, so the Tyres
+    widget's colour thresholds are a placeholder - see `web/tyre-color.js`). `lastLap` is only
+    included when the game reports one (it is -1 before the first lap). The flags become `paused`,
+    `loading` and `onTrack`, which the lap tracker uses to hold timing, plus `revLimitAlert` (the
+    game's own "bouncing off the limiter" bit, separate from the static `rpmLimiter` threshold).
+    `totalLaps` is left out for now because its offset in the packet is unconfirmed. `gear` is -1 in
+    reverse, inferred per `_is_reversing` since GT7 doesn't signal it directly.
 
     `t_ms` comes from a `GameClock`, which prefers the game's own clock to arrival times.
     """
@@ -133,12 +135,14 @@ def to_frame(decoded, t_ms):
         "speed": round(decoded["speed_ms"] * 3.6, 2),
         "throttle": round(decoded["throttle"] / 2.55, 1),
         "brake": round(decoded["brake"] / 2.55, 1),
+        "clutch": round(decoded["clutch"] * 100, 1),
         "gear": gear,
         "suggestedGear": gear if suggested == NO_SUGGESTED_GEAR else suggested,
         "rpm": round(decoded["rpm"]),
         "rpmWarning": decoded["rpm_warning"],
         "rpmLimiter": decoded["rpm_limiter"],
         "revLimitAlert": flags["rev_limit_alert"],
+        "tyreTemp": [round(t, 1) for t in decoded["tyre_temp"]],
         "paused": flags["paused"],
         "loading": flags["loading"],
         "onTrack": flags["car_on_track"],

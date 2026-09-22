@@ -117,6 +117,27 @@ test('timeAt interpolates and clamps', () => {
   assert.deepEqual(sectorTimes({ ...lap, timeMs: 2000 }, [100]), [1000, 1000]);
 });
 
+test('speedSeries tracks the recording lap against the comparison lap, and extends as it grows', () => {
+  const tr = new LapTracker();
+  const src = new DemoSource(data);
+  // Feed until at least one full lap exists (so there's a reference and a comparison lap) and
+  // another is in progress.
+  while (!(tr.laps.length >= 1 && tr.live?.recording)) tr.ingest(src.frame(src.index++));
+
+  const first = tr.speedSeries();
+  assert.ok(first.p.length > 0);
+  assert.deepEqual(first.mine, tr.cur.speed.slice(0, first.mine.length));
+  for (let i = 1; i < first.p.length; i++) assert.ok(first.p[i] >= first.p[i - 1]);
+  assert.ok(first.theirs.every((v) => typeof v === 'number'));   // the comparison lap covers the whole line
+
+  // Feed a few more frames: the cache should extend, not recompute, so earlier entries are unchanged.
+  for (let i = 0; i < 20 && !src.done; i++) tr.ingest(src.frame(src.index++));
+  const second = tr.speedSeries();
+  assert.ok(second.p.length >= first.p.length);
+  assert.deepEqual(second.p.slice(0, first.p.length), first.p);
+  assert.deepEqual(second.mine.slice(0, first.mine.length), first.mine);
+});
+
 test('formatters', () => {
   assert.equal(fmtLap(62345), '1:02.345');
   assert.equal(fmtLap(59999.6), '1:00.000');

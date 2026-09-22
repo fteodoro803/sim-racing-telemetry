@@ -14,16 +14,26 @@
 <body>
 <div class="app">
 
-  <!-- ===== Top bar: source, connection status, demo controls ===== -->
+  <!-- ===== Top bar: source, connection status, demo controls, presets ===== -->
   <header class="topbar">
-    <div class="topbar-left">
+    <div class="topbar-left" id="chromeLeft">
       <a class="back" id="backLink" href="../" hidden>← Back to Lab</a>
       <span class="brand">TELEMETRY</span>
       <button class="badge" id="sourceBadge" type="button" title="Change source">DEMO</button>
       <span class="dot muted" id="statusDot"></span>
       <span class="status" id="statusText" aria-live="polite"></span>
     </div>
-    <div class="topbar-right">
+    <div class="topbar-left" id="editLeft" hidden>
+      <span class="brand">TELEMETRY</span>
+      <span class="editing-label">Editing layout</span>
+    </div>
+    <div class="topbar-right" id="chromeRight">
+      <div class="presets" id="presetSwitcher" role="tablist">
+        <button class="preset-tab" type="button" role="tab" data-preset="timing">Timing</button>
+        <button class="preset-tab" type="button" role="tab" data-preset="driving">Driving</button>
+        <button class="preset-tab" type="button" role="tab" data-preset="everything">Everything</button>
+        <button class="preset-tab" type="button" role="tab" data-preset="custom">Custom<span class="edited-dot" id="customDot" hidden></span></button>
+      </div>
       <div class="topbar-right" id="demoControls">
         <button class="btn" id="playBtn" type="button">Pause</button>
         <button class="btn" id="restartBtn" type="button">Restart</button>
@@ -39,11 +49,39 @@
       <button class="btn" id="exportBtn" type="button" title="Save this session's laps to a file">Export</button>
       <button class="btn" id="importBtn" type="button" title="Load a saved session from a file">Import</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button class="btn" id="editBtn" type="button">Edit</button>
+    </div>
+    <div class="topbar-right" id="editRight" hidden>
+      <button class="btn" id="paletteBtn" type="button">Add widget</button>
+      <button class="btn" id="resetPresetBtn" type="button">Reset to preset</button>
+      <button class="btn" id="saveCustomBtn" type="button">Save as Custom</button>
+      <button class="btn primary" id="doneBtn" type="button">Done</button>
     </div>
   </header>
 
-  <!-- ===== Widget grid (filled in by app.js from layout.js) ===== -->
+  <!-- ===== Widget grid (filled in by app.js from layout.js / dashboard-state.js) ===== -->
   <main class="grid" id="grid"></main>
+
+  <!-- ===== Palette drawer: add a widget while editing ===== -->
+  <aside class="palette" id="palette" hidden>
+    <div class="palette-title">Add widget</div>
+    <div class="palette-group-title">Timing</div>
+    <div class="palette-list" id="paletteTiming"></div>
+    <div class="palette-group-title">Driving</div>
+    <div class="palette-list" id="paletteDriving"></div>
+    <div class="palette-group-title">Coming later</div>
+    <div class="palette-list">
+      <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Fuel</span><span class="soon">SOON</span></div>
+      <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Track Map</span><span class="soon">SOON</span></div>
+    </div>
+  </aside>
+
+  <!-- ===== Custom, before anything has been added to it ===== -->
+  <div class="empty-state" id="emptyState" hidden>
+    <div class="empty-title">No widgets yet</div>
+    <div class="empty-text">Add widgets from the palette and arrange them on the grid.</div>
+    <button class="btn primary" id="emptyAddBtn" type="button">Add widgets</button>
+  </div>
 
   <!-- ===== Message shown over the grid until the first live frame arrives ===== -->
   <div class="overlay" id="overlay" hidden>

@@ -28,6 +28,17 @@ Tracks what's actually been built, in order, as this plan is implemented.
 8. **Second real PS4 session: three clean unpaused laps.** Confirmed the live delta tracks the game's own lap-time differences closely (the user measured about 4 ms) and that consecutive laps' own times matched the game's within about 20 ms. Found and fixed a subtler issue: the sample marking a lap boundary was placed by interpolating position, which is unreliable right at the start/finish line where the car's path can cross itself; when both sides of the boundary are on the trusted game clock, it is now pinned to the exact game lap time instead ([O14](DECISIONS.md) follow-up). Committed that second session as a test fixture (`bridge/tests/fixtures/gt7-ps4-session.jsonl.gz`), replayed by both test suites; it turned out to also contain a session restart and a pause, so it covers more of Known issue 5 than expected. Added `GT7_TELEMETRY.md`'s "At a glance" table (every field the decoder gives, and whether the dashboard uses it yet), linked from the README.
 9. **First real PS4 session (step 6, in part).** Everything responded. A recorded session showed that arrival-time timestamps made the delta wobble (std 4.3 ms, spikes to 100 ms) and drift from the game's time (a lap timed 384 ms off). The bridge now stamps frames with the game's own clock when it can be trusted (`GameClock`, [O14](DECISIONS.md)): delta noise 0.3 ms, spikes under 6 ms, lap timed to 9 ms. Also fixed after the first attempt failed: a crash when the record folder didn't exist, which the bridge had swallowed ([BUG-1](BUGS.md)).
 10. **Reverse gear** ([D21](DECISIONS.md)). The user noticed the Gear widget never showed reverse. A dedicated real-PS4 capture (drive, stop, reverse back the same way, stop) showed the gear byte reads 0 throughout reverse, identical to neutral — GT7 gives no separate signal for it. The bridge now infers reverse from `velocity` opposing the heading derived from `rotation`'s yaw (`_is_reversing` in `bridge/frames.py`); the frame's `gear` is -1 and the widget shows "R". Committed the capture as a test fixture (`bridge/tests/fixtures/gt7-ps4-reverse.jsonl.gz`, replayed by `bridge/tests/test_real_reverse.py`).
+11. **Customisable dashboard** (section 8; D11, D23, D24), built ahead of the original order (step 7) since the first-pass real-console testing was already in good shape. `web/layout.js` gained the widget registry (`WIDGET_META`) and the Timing/Driving preset layouts, plus pure/tested grid geometry (`itemsOverlap`, `hasCollision`, `firstFreeSpot`, `resizeFromCorner`). `web/dashboard-state.js` (new, DOM-free, tested) holds which preset is active and Custom's saved layout, persisted to `localStorage`. `web/edit.js` (new) wires the pointer drag/resize/collision interactions from section 8.2 on top of that geometry. `web/app.js` now rebuilds the grid from whichever layout is active (`renderGrid`) instead of a single hard-coded one, and wires the preset switcher, Edit button, palette drawer and the edit-mode top bar. Added the Speed Chart widget (`web/widgets.js`), which needed `LapTracker#speedSeries` in `web/timing.js` (same shape and caching as `deltaSeries`; `timeAt` was refactored onto a shared `valueAt` interpolator so the two share code). Checked end to end in a browser against the fake console: switching presets, entering edit mode, dragging, resizing, adding from the palette (including the "nothing fits" no-op), removing, Save as Custom, Reset to preset, Done, persistence across a reload, the Custom empty state, and both phone breakpoints. `npm test` (73, up from 54) passes.
+    - **Correction while writing section 8**: the wireframe's Driving preset also drew Steering, driver aids and Boost, which would contradict D19 ("aren't wanted") and need undecoded data; none of the three were built (see section 8.1's note). Driving's own layout leaves that space empty instead.
+    - **Not built yet**: the palette's drag-and-drop-from-drawer motion is click-to-add (drops at the first free spot) rather than a drag with a live ghost preview from the drawer itself; dragging an already-placed widget does have the full ghost/collision preview. Good enough for a functioning palette; revisit if it feels wrong in use.
+12. **Widgets are now size-responsive** ([D25](DECISIONS.md)), found necessary while testing 11: resizing a widget in edit mode left its font size fixed (driven by the page-level `--u` unit), so a shrunk widget could overflow and a grown one just left extra space empty. `web/style.css` makes `.widget` a CSS size container; every content rule that used to read `calc(N * var(--u))` now reads `max(floor, min(Hcqh, Wcqw, ceiling))`, scaling off the widget's own box. `.sector` and `.pedal` are nested containers so a 3-up Sectors row or a 2-up Pedals pair size against their own column. `web/charts.js`'s axis text (canvas-drawn) scales the same way off the canvas's rendered size. Verified in a browser: Gear shrunk to its 2×2 floor, Speed grown to 4×7, Delta Chart shrunk to 4×2 - no overflow, no dead space, `npm test` (73) unaffected (pure CSS/canvas, no logic touched).
+13. **RPM and Pedals gained real structural breakpoints, from `design/Widget Responsive Behavior.dc.html`** (committed to `design/`). RPM: a `grid-template-areas` layout in `.rpm-row` switches between three shapes by container size - label-over-value only (too narrow for a bar), label+value+bar inline once ≥300px wide (chosen for bar+tick legibility, not tied to a specific column count, since a widget's actual pixel width also depends on the screen's `--u`), and label+value / a shift-light row / a thicker bar once also ≥230px tall. The shift lights (`rpm-lights`, 12 segments) light up per-segment in the same normal/warn/limit zones as the bar, computed from the frame's own `rpm`/`rpmWarning`/`rpmLimiter` in `widgets.js`. Pedals: gained a third bar, Clutch (`CLU`), and flips from vertical bars to stacked horizontal ones under `@container (max-height: 120px)` via the same DOM/CSS-`order` trick, using a `--fill` custom property so one JS write drives either a bar's height or its width depending on orientation. Required lowering `pedals.minH` from 2 to 1 in `WIDGET_META` - the vertical floor (2×2) and the horizontal shape (down to 1 row tall) are different minimums, and the old registry only had the first. Also added the `clutch` channel end to end (`bridge/gt7.py` already decoded it; `bridge/frames.py` now scales it into the frame like throttle and brake; updated `GT7_TELEMETRY.md`, the README frame format, and `web/demo-source.js`, which reports a constant 0, matching the fake console, since neither models the clutch pedal). Clutch was never part of D19's "not wanted" list (that's driver aids and boost only) - it just hadn't been surfaced yet. The same wireframe also designed the Tyres widget, previously deferred (D12): four tyre+caliper pairs (`web/widgets.js`'s `tyres`), coloured by temperature zone (`web/tyre-color.js`, tested) with a right-side mirror via a CSS class rather than different DOM order, matching the design's calipers-face-the-centreline layout. The design paired the colour with a number despite being told not to; the user chose to build it that way, overturning D12 as [D26](DECISIONS.md). Colour thresholds are a placeholder (GT7 gives no ideal range). Needed `tyreTemp` added to the frame format end to end, the same way `clutch` was (`bridge/frames.py`, `GT7_TELEMETRY.md`, the README, and a speed-derived synthetic value in `web/demo-source.js`, since the fake console's tyre temps are static). `npm test` (75) and `npm run test:bridge` (69) pass.
+    - **Testing note**: verifying the resize interactions in a browser kept hitting a stale-module-cache wall (the served file was correct, confirmed by `curl` and by direct pure-function tests, but the running page's imports wouldn't update even across full reloads and a fresh tab). Re-serving on a different port (a new origin, no cache history) was what finally worked - not a code issue, but worth remembering next time a browser check of a hand-edited `.js` file "won't update".
+14. **RPM and Pedals' shape is now an explicit choice, not picked from size** ([D27](DECISIONS.md)). Log 13's `@container` breakpoints meant resizing could silently restructure a widget (a narrow RPM lost its bar without being asked to); the user wanted the two separated. `WIDGET_META` entries gained a `variants` list; a layout item can carry `variant` (`web/layout.js`'s `defaultVariant` picks the first when it doesn't); a `<select>` in the widget's edit-mode chrome (`buildEditChrome` in `web/edit.js`, wired to a new `editor.setVariant`) switches it, setting `data-variant` on the card. `style.css`'s breakpoints became `[data-variant="…"]` rules; the D25 fluid cqh/cqw scaling inside each shape didn't need to change. Checked in a browser: switching RPM to "Shift Lights" then shrinking it to 3×1 keeps the lights (cramped, but not broken) instead of reverting to the bar-less shape; Pedals' "Horizontal" choice round-trips through Save as Custom and a reload. `npm test` (76) passes.
+15. **Adjustments from an updated `design/Widget Responsive Behavior.dc.html`** (overwritten in place; same session as logs 13-14). Three changes:
+    - **Pedals layout shift, fixed.** `.pedal-pct` had no fixed width, so "100%" (three digits) was wider than "0%"/"78%", nudging the whole row's `justify-content: space-around` spacing whenever a pedal hit full. Gave it a fixed, cqh/cqw-scaled width in the vertical layout too (the horizontal one already had this).
+    - **Tyres, resized.** The user's adjusted design fills more of the box (~60%) with tighter gaps between the four corners; updated the `.tyre`/`.caliper`/`.tyre-temp` clamp() formulas and `.tyre-grid`'s gap to match.
+    - **RPM gained two more variants**, `segmented` (2e: number + a lit-segment bar in one row, instead of a continuous fill) and `barOnly` (2f: the segmented bar alone, no number) - both reuse the existing `.rpm-lights` markup already built for the `lights` variant, just placed inline instead of in its own row. Five RPM variants now: Compact, Bar, Segmented, Bar Only, Shift Lights. `npm test` (76) passes.
 
 ## 1. Grid and layout
 
@@ -95,9 +106,7 @@ Not in the first version: **Steering** (needs packet type B or C, whose offsets 
 - **Setup panel** (modal over the dashboard): choose Demo or Live; Live has a bridge-address field (the wireframe shows `ws://localhost:9010` as an example), a Connect button, three steps ("Start the bridge on your computer", "Start GT7", "Connect") and a "Download the bridge" link.
 - **Connection states:** connecting; connected but waiting for the game ("Waiting for GT7. Start a race or time trial."); live and healthy; timing held ("Timing held (paused). This lap won't count towards best times.", with a "not counted" tag on the current lap); connection lost (values dimmed, "Lost connection. Retrying…").
 - **Widget no-data state:** a dash with a subtle "no data" note.
-- **Presets** (later): Timing, Driving, Everything, and a Custom that starts as a copy of the active preset, with an "edited" state and a blank state.
-- **Edit mode** (later): drag handles, four resize handles and a remove button per widget, a palette drawer (Timing, Driving, and "coming later" entries for Tyres, Fuel and Track map), a red invalid-drop state, and Done / Reset to preset / Save as Custom.
-- **Phone** (later): a single-column stack in priority order (Delta, Current lap, Gear/Speed/RPM, Sectors, Last/Best, then the rest), portrait plus a simplified landscape; no edit mode.
+- **Presets, edit mode and phone** (later, not in the first pass): full spec in section 8, from `Presets.dc.html`, `Edit Mode.dc.html` and `Phone Dashboard.dc.html`.
 
 ## 5. Changes from the wireframes
 
@@ -131,6 +140,74 @@ PS4 --UDP--> bridge --WebSocket--> page (served by the bridge over http, or the 
 6. Try it on the real PS4 and iPad, then fix what the real packets show (offsets, gear encoding, boost, pause flags).
 7. After that: presets, edit mode, the Custom layout, then the tyre and track-map passes.
 
+## 8. Presets, edit mode and phone (customisable dashboard, [D11](DECISIONS.md))
+
+Comes after the first testable version (step 7 above). From `Presets.dc.html`, `Edit Mode.dc.html` and `Phone Dashboard.dc.html`. The grid is hand-rolled, not a library ([D23](DECISIONS.md)).
+
+### 8.1 Preset layouts
+
+Same grid as section 1 (12×8, 82px rows, 12px gutters). "Everything" is the fixed layout already built (section 1). The other two presets rearrange the same widgets:
+
+| Widget | Timing | Driving |
+|---|---|---|
+| Current lap | 6×2, col 1–6, row 1–2 | 2×2, col 11–12, row 2–3 |
+| Delta | 6×2, col 7–12, row 1–2 | 2×2, col 11–12, row 4–5 |
+| Sectors | 12×2, col 1–12, row 3–4 | — |
+| Speed chart | 6×2, col 1–6, row 5–6 | — |
+| Delta chart | 6×2, col 7–12, row 5–6 | — |
+| Last lap / Best lap / Predicted | 2×2 each, row 7–8, col 1–2 / 3–4 / 5–6 | — |
+| Lap table | 6×2, col 7–12, row 7–8 | — |
+| RPM | — | 12×1, col 1–12, row 1 |
+| Gear | — | 4×4, col 1–4, row 2–5 |
+| Speed | — | 6×4, col 5–10, row 2–5 |
+| Pedals | — | 2×3, col 1–2, row 6–8 |
+
+Notes:
+- Timing's Speed chart is the palette-only widget from section 1; it ships with the customisable dashboard, not before.
+- **The wireframe's Driving preset also shows Steering, driver aids and Boost; none of the three are built.** Checked against [D19](DECISIONS.md) while writing this spec: driver aids and boost "aren't wanted" (not "later" — a firm no), and steering needs packet type B or C, which the bridge doesn't decode ([Known issue 14](PROJECT_CONTEXT.md)). So Driving's own space (col 3–12, row 6–8 in the wireframe) stays empty in the built preset for now; the palette has no Driving-only entries beyond what section 1 already has (Gear, Speed, RPM, Pedals) until one of those changes. If steering ships later (its own session, [D19](DECISIONS.md)), it joins the palette then; driver aids and boost would need D19 revisited first.
+- **Custom starts blank** ([D24](DECISIONS.md)): no widgets, a centred "No widgets yet — Add widgets from the palette and arrange them on the grid" message and an "Add widgets" button that opens the palette. Once the user adds anything, Custom holds whatever they built; there is no "reset to copy of X" — only "Reset to preset" in edit mode, which for Custom means "back to blank" (see 8.2).
+
+### 8.2 Edit mode
+
+Entered from the top bar's Edit button on any preset (including Custom). Top bar swaps to: "Editing layout" label, and three actions — **Reset to preset** (Custom: back to blank; Timing/Driving/Everything: back to that preset's default arrangement, discarding edits), **Save as Custom** (copies the current, possibly-edited arrangement into Custom and switches to it), **Done** (exits edit mode, keeping the edits in place for Custom; Timing/Driving/Everything edits are not persisted — only Custom is saved, so editing a built-in preset is really a way to seed Custom via "Save as Custom").
+
+Per-widget chrome while editing:
+- **Drag handle** (top-left, `⠿`), press-and-hold to drag.
+- **Remove button** (top-right, ×, red-tinted).
+- **Four corner resize handles**, dashed squares just outside each corner.
+- **Size tag** (bottom-left), e.g. "3×2", showing the widget's current cell span.
+- **Variant select** (top-centre), only for widgets with more than one shape (RPM, Pedals): switches the widget's shape explicitly, independent of its size ([D27](DECISIONS.md); §8 note below).
+- Non-dragged widgets get a dashed border instead of the normal solid one, to read as "editable" without competing with the dragged widget.
+
+Drag interaction:
+1. Press and hold the drag handle; the widget lifts (shadow, slight rotation, "DRAGGING" label, `pointer-events:none` on the grid beneath) and follows the pointer.
+2. A ghost outline shows the cell(s) the drop would snap to, snapping to whole cells only.
+3. If the ghost overlaps another widget, the ghost turns red-dashed and the overlapped widget(s) tint red — invalid drop, releasing there snaps back to the widget's last valid position.
+4. On a valid release, the widget snaps into the new cells; other widgets do not auto-rearrange to make room (no auto-flow) — an invalid drop is just rejected, not resolved by pushing anything else.
+
+Resize interaction: dragging a corner handle grows/shrinks the widget by whole cells from that corner, with the same collision check as drag (red ghost/tint, snaps back if invalid). Each widget declares a minimum size in its registry entry (the widget registry is `CLAUDE.md`'s "Dashboard elements are widgets" convention); resize can't go below it.
+
+Palette drawer: opens over the right edge of the grid (300px wide, on top — widgets underneath are still visible/dimmed, not reflowed) when adding a widget, grouped **Timing** (Current lap, Delta, Sectors, Delta chart, Speed chart, Last/Best/Predicted, Lap table) and **Driving** (Gear, Speed, RPM, Pedals) — every widget built in section 1, plus Speed chart. A disabled **Coming later** group (Tyres, Fuel, Track map, greyed at 45% opacity with a "SOON" pill, not draggable) covers widgets that don't exist yet; Steering, driver aids and Boost belong there too once any of them ships, per the 8.1 note above, not before. Each entry shows a size swatch, name and cell-size tag (e.g. "6×3" for Lap Table — larger than its 4×4 default in the fixed grid, room for more rows). Dragging an entry from the palette onto the grid works like moving an existing widget: ghost preview, red invalid-drop state, snap on release.
+
+### 8.3 Phone layout
+
+No edit mode on phone — presets and Custom (as built on a wider screen) collapse automatically; there's nothing to rearrange. Portrait is the primary phone layout: a single-column stack in this priority order, each widget going full-width:
+
+1. Delta
+2. Current lap
+3. Gear / Speed / RPM cluster (Gear and Speed side by side, ~130px + flex; RPM full-width below as a labelled bar)
+4. Sectors (three columns in one card, same as desktop's per-sector layout)
+5. Last lap / Best lap (side by side)
+6. Predicted
+7. Delta over lap (chart)
+8. Pedals (bars flip to horizontal, label + bar + percentage per row instead of vertical bars)
+
+The wireframe continues with Steering, driver aids and Boost below Pedals; dropped here for the same reason as 8.1 — they aren't built. Add them to the end of this order if any of them ships.
+
+At 390×844, items 1–5 fit above the fold; the rest needs a scroll. Landscape phone (844×390) is a simplified fallback, not the full stack: just the top-priority cluster (Delta, Current lap, Sectors in a row; Gear, Speed, RPM in a second row) — the rest is reachable by rotating back to portrait, not by scrolling landscape.
+
+This mapping is a fixed, hard-coded phone layout, not a fourth breakpoint of the grid — the widget registry doesn't need per-widget phone positions, only this priority order, since the grid's column/row spans stop applying below the grid's minimum usable width.
+
 ## Verification
 
 - `npm test` and `npm run test:bridge` pass.
@@ -143,5 +220,5 @@ PS4 --UDP--> bridge --WebSocket--> page (served by the bridge over http, or the 
 - ~~How does GT7 encode neutral and reverse in the gear field? The wireframe shows "N".~~ **Resolved** ([D21](DECISIONS.md)): it doesn't — the gear byte reads 0 (neutral) throughout reverse too. The frame's `gear` is -1 in reverse, inferred from velocity opposing heading; the widget shows "R".
 - Pedal colours: throttle blue and brake amber. Check they read well next to the delta's green and red once seen on the iPad.
 - Whether `onTrack` (flag bit 0) really means what the parser docs say. If GT7 clears it in some modes, timing would be held throughout; the page shows why, so it will be visible on first contact.
-- Hand-rolled or library grid for edit mode: [O13](DECISIONS.md).
+- ~~Hand-rolled or library grid for edit mode.~~ **Resolved** ([D23](DECISIONS.md)): hand-rolled.
 - Whether to serve over http only, or also offer a way to reach it by name (for example the Mac's `.local` hostname).
