@@ -341,7 +341,8 @@ function tick(now) {
  * Find out whether a bridge served this page, build the grid, and start the right source.
  *
  * A bridge answers /bridge.json; the hosted page has no such file. Served by a bridge, the page
- * connects straight to it. Otherwise it starts the demo and leaves the setup panel to the user.
+ * connects straight to it. Otherwise it opens the setup panel and lets the user choose a source,
+ * rather than autoplaying the demo before they've asked for it.
  */
 async function main() {
   buildGrid();
@@ -352,7 +353,7 @@ async function main() {
   } catch { /* no bridge: this is the hosted page */ }
   $('backLink').hidden = app.servedByBridge;
   if (app.servedByBridge) startLive(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  else await startDemo();
+  else openSetup();
   requestAnimationFrame(tick);
 }
 
