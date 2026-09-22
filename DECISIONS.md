@@ -69,6 +69,8 @@ D7 settled the principle. These details were Claude's: frames flagged `paused`, 
 **O14. Frame timestamps come from the game's own clock when it can be trusted, and from arrival time otherwise.**
 The bridge first stamped frames with the time the packet arrived. On a real session that carried Wi-Fi jitter (delta wobbled by several ms, with a 100 ms spike) and ran about 0.3% off the game's time, so a lap timed from timestamps alone came out 384 ms off the game's own lap time. The packet carries a game clock (`0x80`, time of day in ms) that matched the game's lap times to a frame, cutting delta noise from 4.3 ms to 0.3 ms and the lap-time error to 9 ms. Tradeoff: time of day can be accelerated in some events, so the bridge uses the clock only after seeing it run at about real time (95–105% over roughly 10 s of packets), and falls back to arrival time otherwise, so `t` is always continuous and never goes backwards. Packet ids were rejected as a clock because the packet rate wanders between 59.65 and 59.94 a second.
 
+*Follow-up:* even trusting the game clock, the crossing sample at a lap boundary was still placed by interpolating position, which is unreliable exactly where it matters most: right at the start/finish line, where the car's path can cross itself. When both frames either side of a lap change are on the trusted game clock, the boundary is now pinned to exactly `startT + timeMs` instead (`LapTracker._closeLap` in `web/timing.js`). This only affects where the *next* lap starts counting from (and so every sample in it), not the closing lap's own stored time, which was already set from the trusted lap time regardless.
+
 ---
 
 ## Open — bridge

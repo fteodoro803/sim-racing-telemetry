@@ -281,3 +281,75 @@ test('a game lap time far from our own estimate is not trusted', () => {
   const lap = tr.laps.find((l) => l.n === frames[at].lap - 1);
   assert.ok(Math.abs(lap.timeMs - truth) < 120, `${lap.timeMs} vs ${truth}`);
 });
+
+// ---- pinning a lap boundary to the game's own lap time --------------------------------------
+
+/**
+ * Position `d` metres (0..400, wrapping) around a 100x100 m square loop, at 10 m/s.
+ *
+ * A straight out-and-back line makes a degenerate reference (the return path lies exactly on the
+ * outbound one, so projecting a point onto it is ambiguous everywhere), which is why this is a loop.
+ */
+function squarePos(d) {
+  const m = ((d % 400) + 400) % 400;
+  if (m < 100) return [m, 0];
+  if (m < 200) return [100, m - 100];
+  if (m < 300) return [100 - (m - 200), 100];
+  return [0, 100 - (m - 300)];
+}
+
+/**
+ * Frames for two laps of the square loop (lap 1 becomes the reference; lap 2 is the lap under test),
+ * closing into lap 3 at distance `crossAt`. `gameClock` and `lastLap` on the closing frame are
+ * overridable, so tests can check what pinning does and does not do to that closure.
+ */
+function pinningFrames({ gameClockThroughout = true, closingGameClock = gameClockThroughout, lastLap = 40037, crossAt = 5 } = {}) {
+  const mk = (t, d, lap, extra = {}) => {
+    const [x, z] = squarePos(d);
+    return { t, x, z, speed: 36, throttle: 0, brake: 0, lap, gameClock: gameClockThroughout, ...extra };
+  };
+  const frames = [mk(-1000, 390, 0)];                                            // joined mid the out-lap
+  for (let i = 0; i <= 40; i++) frames.push(mk(i * 1000, i * 10, 1));            // lap 1: reference, one loop
+  for (let i = 1; i <= 40; i++) frames.push(mk(41000 + i * 1000, i * 10, 2));    // lap 2: t=42000..82000
+  frames.push(mk(82500, crossAt, 3, { lastLap, gameClock: closingGameClock })); // crosses partway through this frame
+  return frames;
+}
+
+test('when frames are on the game clock, the lap boundary is pinned to the game lap time', () => {
+  const tr = run(pinningFrames());
+  assert.equal(tr.laps[1].timeMs, 40037);
+  assert.equal(tr.laps[1].gameClock, true);
+  // Pinning sets where the next lap starts counting from to exactly startT + timeMs, rather than
+  // wherever the position-based interpolation happened to land (which, right at this loop's seam,
+  // is unreliable - see the interpolated case below).
+  assert.equal(tr.cur.startT, tr.laps[1].startT + 40037);
+});
+
+test('an interpolated (non-pinned) crossing can land far from the game lap time, which is what pinning fixes', () => {
+  // Not on the game clock, so pinning cannot apply: the interpolated crossing is used instead, and at
+  // this loop's seam (the sample just before crossing sits exactly on the start/finish point) that
+  // estimate is badly wrong, off by over a second from the trusted lap time.
+  const tr = run(pinningFrames({ gameClockThroughout: false, closingGameClock: false }));
+  assert.equal(tr.laps[1].timeMs, 40037);                                // the lap time itself is still right...
+  assert.notEqual(tr.cur.startT, tr.laps[1].startT + 40037);             // ...but the next lap's clock isn't pinned to it
+  assert.ok(Math.abs(tr.cur.startT - (tr.laps[1].startT + 40037)) > 500, 'expected a large interpolation error at the seam');
+});
+
+test('pinning needs both the previous and the crossing frame to be on the game clock', () => {
+  // Neither case pins: one has no game-clock samples in the closing lap at all, the other's crossing
+  // frame itself isn't on the game clock (which is what the pinning check looks at directly).
+  const notPinned = run(pinningFrames({ gameClockThroughout: false, closingGameClock: true }));
+  assert.equal(notPinned.laps[1].gameClock, false);
+  assert.notEqual(notPinned.cur.startT, notPinned.laps[1].startT + 40037);
+
+  const alsoNotPinned = run(pinningFrames({ gameClockThroughout: true, closingGameClock: false }));
+  assert.notEqual(alsoNotPinned.cur.startT, alsoNotPinned.laps[1].startT + 40037);
+});
+
+test('an implausible game lap time is not trusted, so pinning does not use it either', () => {
+  // 5000 ms off is well past the trust tolerance (1500 ms): the tracker falls back to its own estimate
+  // for timeMs, and pinning (which only ever uses a trusted timeMs) has nothing wrong to pin to.
+  const tr = run(pinningFrames({ lastLap: 45037 }));
+  assert.notEqual(tr.laps[1].timeMs, 45037);
+  assert.notEqual(tr.cur.startT, tr.laps[1].startT + 45037);
+});

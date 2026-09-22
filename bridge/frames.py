@@ -74,6 +74,17 @@ class GameClock:
         return self.t
 
 
+def make_frame(decoded, clock, arrival_ms):
+    """Build the frame for a decoded packet: stamp it with `clock`, and say whether `t` is the game's clock.
+
+    `gameClock` is true when `t` comes from the game's own clock. The page uses that to know that the
+    game's lap times are in the same time base as `t`, so lap boundaries can be pinned to them exactly.
+    """
+    frame = to_frame(decoded, clock.update(decoded["time_value"], arrival_ms))
+    frame["gameClock"] = clock.trusted
+    return frame
+
+
 def to_frame(decoded, t_ms):
     """Turn one decoded type-A packet into a frame, stamped `t_ms` milliseconds after the bridge started.
 

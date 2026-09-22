@@ -323,6 +323,7 @@ export class LapTracker {
 
     // 5. Record a sample for the lap in progress
     if (this.cur.recording) this._addSample(f, f.t - this.cur.startT);
+    if (!f.gameClock) this.cur.gameClock = false;
     this.prev = f;
 
     // 6. Refresh the live readout
@@ -338,6 +339,7 @@ export class LapTracker {
   _openLap(n, recording, startT, openFrame) {
     this.cur = {
       n, recording, startT, seg: 0, lastP: 0, ownDist: 0, invalid: false,
+      gameClock: !!openFrame.gameClock,   // stays true only while every frame of the lap is on the game's clock
       t: [], p: [], speed: [], throttle: [], brake: [], x: [], z: [],
     };
     if (recording) this._push(openFrame, 0, 0);
@@ -409,7 +411,18 @@ export class LapTracker {
       // 2. Store the lap that just ended; the game's own lap time wins when it is fresh and plausible
       const estimate = tc - cur.startT;
       const trusted = f.lastLap > 0 && !stale && Math.abs(f.lastLap - estimate) <= LAP_TIME_TOLERANCE_MS;
-      this._finishLap(cur, xf, trusted ? f.lastLap : estimate);
+      const timeMs = trusted ? f.lastLap : estimate;
+
+      // When our timestamps are the game's own clock, the game's lap time is in the same time base, so
+      // the lap ended exactly `timeMs` after it began. That is better than the interpolated crossing,
+      // which relies on position and can be badly off right where two paths cross near the start/finish
+      // line, and (because it errs the same way for every lap) shifts a whole lap's delta. The lap time
+      // itself was already sanity-checked above (`trusted`), so pinning doesn't re-check it again.
+      if (trusted && f.gameClock && cur.gameClock && f.t > prev.t) {
+        tc = cur.startT + timeMs;
+        xf = lerpFrame(prev, f, Math.min(1, Math.max(0, (tc - prev.t) / (f.t - prev.t))));
+      }
+      this._finishLap(cur, xf, timeMs);
     }
 
     // 3. Open the next lap, starting at the crossing
@@ -428,7 +441,7 @@ export class LapTracker {
     // An interrupted lap can't become the reference: its path may have gaps.
     if (cur.invalid && !this.ref) return;
     const lap = {
-      id: this.laps.length + 1, n: cur.n, timeMs, valid: !cur.invalid,
+      id: this.laps.length + 1, n: cur.n, timeMs, valid: !cur.invalid, startT: cur.startT, gameClock: cur.gameClock,
       t: cur.t, p: cur.p, speed: cur.speed, throttle: cur.throttle, brake: cur.brake, x: cur.x, z: cur.z,
     };
     if (!this.ref) this.ref = buildReference(lap);

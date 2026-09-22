@@ -4,6 +4,39 @@ What Gran Turismo 7 sends over UDP, its units and quirks, and what this project 
 
 > **Status: partly confirmed, and now checked against a real PS4.** The transport details and the type-A byte offsets below are confirmed by a working open-source implementation (gt7dashboard), and an 11-minute type-A session recorded from a real PS4 (2026-09-22) confirmed the encryption, the heartbeat, the packet rate, the pause and loading flags, and several fields; see "Confirmed on a real PS4". Everything else is assembled from community parser documentation (see Sources). Companion docs: [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) (known issues, especially 2, 5 and 6), [`DECISIONS.md`](DECISIONS.md), [`FEATURE_MAP.md`](FEATURE_MAP.md).
 
+## At a glance: every field the decoder gives, and what we do with it
+
+`decode_a()` in `bridge/gt7.py` turns a decrypted packet into this. "In use" means the dashboard
+reads it today (`bridge/frames.py`); "decoded, unused" means it's a Python dict key already, ready
+for a future widget; the detailed tables further down give units, offsets and confirmation status
+for each. A worked real example (values from an actual PS4 packet) is in the README's "Try it".
+
+| Field | What it is | Status |
+|---|---|---|
+| `position`, `velocity` | car position (x, y=height, z) and velocity, m / m·s⁻¹ | decoded, unused (x, z drive lap timing separately, via the frame's own `x`/`z`) |
+| `rotation`, `angular_velocity` | pitch/yaw/roll and their rates | decoded, unused |
+| `body_height`, `road_plane`, `road_plane_distance` | ride height and road banking | decoded, unused |
+| `speed_ms` | speed, m/s | **in use** (Speed widget) |
+| `rpm`, `rpm_after_clutch` | engine rpm | **in use** (RPM widget) |
+| `rpm_warning`, `rpm_limiter` | shift-alert and limiter rpm | **in use** (RPM widget's markers) |
+| `estimated_top_speed` | top speed in current gearing | decoded, unused |
+| `gear`, `suggested_gear` | current gear (0 = neutral, guessed), suggested gear (15 = none) | **in use** (Gear widget) |
+| `clutch`, `clutch_engagement` | 0–1 | decoded, unused |
+| `gear_ratios` (×8), `transmission_top_speed` | gearbox detail | decoded, unused |
+| `throttle`, `brake` | pedals, 0–255 | **in use** (Pedals widget) |
+| `boost` | turbo boost | decoded, unconfirmed (see below), unused |
+| `fuel_level`, `fuel_capacity` | litres | decoded, unused (fuel widget is later, [D19](DECISIONS.md)) |
+| `oil_pressure`, `water_temp`, `oil_temp` | the last two are fixed constants, so carry no information | decoded, unused |
+| `tyre_temp` (×4) | surface temperature, °C | decoded, unused (tyre-colour pass is its own dedicated pass, [D12](DECISIONS.md)) |
+| `wheel_rps`, `tyre_radius`, `suspension_height` (×4 each) | wheel speed, radius, suspension travel | decoded, unused |
+| `lap` | the lap counter | **in use** (drives all lap/sector timing) |
+| `best_lap`, `last_lap` | ms, −1 if none | `last_lap` **in use**; `best_lap` unused (the tracker computes its own) |
+| `time_value` | the game's own clock, ms | **in use** (the frame's timestamp, when trusted; [O14](DECISIONS.md)) |
+| `laps_in_race` | 0 in free run/time trial, confirmed | decoded, unused |
+| `position_values` | two numbers, meaning still unclear | decoded, unused |
+| `flags` | paused / loading / on-track / in-gear / rev-limit-alert / handbrake and others | paused/loading/on-track **in use** (holds timing); the rest decoded, unused |
+| `packet_id`, `car_code` | sequence number, car identifier | decoded, unused |
+
 ## Transport
 
 - **Protocol:** UDP, about 60 packets a second.
