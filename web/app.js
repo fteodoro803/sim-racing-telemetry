@@ -483,7 +483,7 @@ function tick(now) {
   const dt = Math.min(now - lastNow, 100);   // a backgrounded tab must not fast-forward the demo
   lastNow = now;
   if (app.mode === 'demo' && app.demo && !app.paused && !app.demo.done) {
-    app.demo.advance(dt, Number($('speedSel').value), ingest);
+    app.demo.advance(dt, 1, ingest);
   }
   render();
   requestAnimationFrame(tick);
