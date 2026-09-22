@@ -16,3 +16,12 @@ export function el(tag, className = '', text = '') {
   if (text) node.textContent = text;
   return node;
 }
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Create a namespaced SVG element with the given attributes (e.g. `svgEl('path', { d: '...' })`). */
+export function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
+  return node;
+}

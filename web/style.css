@@ -221,75 +221,63 @@ button, select, input { font: inherit; color: inherit; }
 .legend-item.cur::before { background: var(--accent); }
 .legend-item.ref::before { background: var(--reference); }
 
-/* ---- rpm ----
- * Five shapes, chosen explicitly in edit mode (D27), not picked from the widget's size (design/
- * Widget Responsive Behavior.dc.html, 2a-2f). All the same four elements (label, value, track,
- * lights), just rearranged and shown/hidden per `data-variant` on the card - no JS DOM changes
- * between them. Content still scales fluidly with the box in any of them (D25).
- *  - compact (default): label above value, no bar, no lights.
- *  - bar: label, value and a continuous-fill bar (with warning/limiter ticks) sit in a row.
- *  - segmented: the same row, but the bar is the lit-segment style instead of a continuous fill.
- *  - barOnly: label and the segmented bar, no numeric readout.
- *  - lights: label+value, a shift-light row, and a thicker continuous bar, stacked - meant for a
- *    widget with enough headroom that the escalation toward the limiter is worth the extra row. */
-.rpm-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-areas: "label" "value";
-  align-content: center;
-  row-gap: calc(4 * var(--u));
-  width: 100%;
-  height: 100%;
+/* ---- rpm + gear (combined) ----
+ * Three shapes, chosen explicitly in edit mode (D27), not picked from the widget's size (design/
+ * Widget Responsive Behavior.dc.html, "RPM + Gear (combined)"; D28). Gear stays the dominant,
+ * fastest-to-read element in every shape; the shift lights (or ring) give rev-zone feedback
+ * without needing the rpm number read. Content scales fluidly with the box in any of them (D25).
+ *  - stacked (default): gear + suggested-gear hint, a "RPM  1234" label row, and a 12-segment
+ *    shift-light bar, stacked top to bottom.
+ *  - column: an edge-to-edge gear digit beside a vertical 12-segment shift-light column - no
+ *    numeric rpm readout, for a small/square slot where the digit should dominate.
+ *  - ring: the gear digit centred over a circular shift-light "ring" that fills clockwise - no
+ *    numeric rpm readout either. */
+.rg { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; gap: max(4px, min(6cqh, 4cqw, 10px)); }
+
+.rg-gear-row { position: relative; display: flex; align-items: baseline; gap: max(4px, min(4cqh, 3cqw, 10px)); }
+.rg-gear { font-family: var(--mono); font-weight: 700; color: var(--accent); line-height: 1; font-size: max(28px, min(45cqh, 30cqw, 80px)); }
+.rg-hint { position: absolute; left: 100%; bottom: max(4px, min(8cqh, 4cqw, 8px)); font-family: var(--mono); font-size: max(9px, min(8cqh, 4cqw, 12px)); color: var(--muted); white-space: nowrap; }
+
+.rg-rpm-row { width: 100%; display: flex; justify-content: space-between; align-items: baseline; }
+.rg-rpm-label { font-family: var(--mono); font-size: max(9px, min(8cqh, 4cqw, 12px)); color: var(--muted); }
+.rg-rpm-value { font-family: var(--mono); font-weight: 700; font-size: max(9px, min(8cqh, 4cqw, 12px)); color: var(--text); }
+
+.rg-lights { width: 100%; display: flex; gap: max(2px, min(2cqh, 1cqw, 5px)); }
+.rg-light { flex: 1; height: max(7px, min(14cqh, 4cqw, 28px)); border-radius: calc(3 * var(--u)); background: var(--line); }
+.rg-light.lit { background: var(--accent); }
+.rg-light.lit.warn { background: var(--amber); }
+.rg-light.lit.limit { background: var(--bad); }
+
+.rg-ring { display: none; position: relative; width: min(100%, 100cqh); aspect-ratio: 1; }
+.rg-ring svg { width: 100%; height: 100%; }
+.rg-ring-bg { fill: none; stroke: var(--line); stroke-width: 8; stroke-linecap: round; }
+.rg-ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear, stroke 0.2s ease; }
+.rg-ring-fg.warn { stroke: var(--amber); }
+.rg-ring-fg.limit { stroke: var(--bad); }
+.rg-ring-fg.flash { animation: rg-flash 0.2s steps(1) infinite; }
+.rg-ring-gear {
+  display: none;
+  position: absolute; inset: 0; align-items: center; justify-content: center;
+  font-family: var(--mono); font-weight: 700; color: var(--text); font-size: max(28px, min(40cqh, 26cqw, 72px));
 }
-.rpm-label { grid-area: label; }
-.rpm-value { grid-area: value; min-width: max(48px, min(30cqh, 22cqw, 90px)); font-size: max(16px, min(45cqh, 22cqw, 44px)); font-weight: 600; }
-.rpm-track { grid-area: track; display: none; position: relative; height: max(6px, min(35cqh, 8cqw, 18px)); background: rgba(255,255,255,.07); border-radius: calc(4 * var(--u)); }
-.rpm-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); border-radius: calc(4 * var(--u)); }
-.rpm-fill.warn { background: var(--amber); }
-.rpm-fill.limit { background: var(--bad); }
-.rpm-fill.flash { animation: rpm-flash 0.2s steps(1) infinite; }
-.rpm-mark { position: absolute; top: calc(-3 * var(--u)); bottom: calc(-3 * var(--u)); width: 2px; background: var(--dim); }
-.rpm-mark.limit { background: var(--bad); }
-.rpm-lights { grid-area: lights; display: none; gap: max(2px, min(2cqh, 1cqw, 5px)); }
-.rpm-light { flex: 1; height: max(8px, min(14cqh, 3cqw, 20px)); border-radius: calc(3 * var(--u)); background: var(--line); }
-.rpm-light.lit { background: var(--accent); }
-.rpm-light.lit.warn { background: var(--amber); }
-.rpm-light.lit.limit { background: var(--bad); }
 
-.widget[data-variant="bar"] .rpm-row,
-.widget[data-variant="segmented"] .rpm-row,
-.widget[data-variant="barOnly"] .rpm-row,
-.widget[data-variant="lights"] .rpm-row {
-  align-items: center;
-  column-gap: calc(16 * var(--u));
-}
-.widget[data-variant="bar"] .rpm-value,
-.widget[data-variant="segmented"] .rpm-value,
-.widget[data-variant="lights"] .rpm-value { font-size: max(16px, min(45cqh, 10cqw, 44px)); }
+@keyframes rg-flash { 50% { opacity: 0.4; } }
 
-.widget[data-variant="bar"] .rpm-row { grid-template-columns: auto auto 1fr; grid-template-areas: "label value track"; }
-.widget[data-variant="bar"] .rpm-track { display: block; }
+.widget[data-variant="column"] .rg { flex-direction: row; }
+.widget[data-variant="column"] .rg-hint,
+.widget[data-variant="column"] .rg-rpm-row { display: none; }
+.widget[data-variant="column"] .rg-gear-row { flex: 1; justify-content: center; }
+.widget[data-variant="column"] .rg-gear { font-size: max(40px, min(85cqh, 55cqw, 130px)); }
+.widget[data-variant="column"] .rg-lights { flex-direction: column-reverse; width: max(10px, min(14cqw, 6cqh, 22px)); height: 100%; }
+.widget[data-variant="column"] .rg-light { height: auto; }
 
-.widget[data-variant="segmented"] .rpm-row { grid-template-columns: auto auto 1fr; grid-template-areas: "label value lights"; }
-.widget[data-variant="segmented"] .rpm-lights { display: flex; }
+.widget[data-variant="ring"] .rg-gear-row,
+.widget[data-variant="ring"] .rg-rpm-row,
+.widget[data-variant="ring"] .rg-lights { display: none; }
+.widget[data-variant="ring"] .rg-ring { display: block; }
+.widget[data-variant="ring"] .rg-ring-gear { display: flex; }
 
-.widget[data-variant="barOnly"] .rpm-row { grid-template-columns: auto 1fr; grid-template-areas: "label lights"; }
-.widget[data-variant="barOnly"] .rpm-value { display: none; }
-.widget[data-variant="barOnly"] .rpm-lights { display: flex; }
-
-.widget[data-variant="lights"] .rpm-row {
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto auto;
-  grid-template-areas: "label value" "lights lights" "track track";
-  row-gap: calc(10 * var(--u));
-}
-.widget[data-variant="lights"] .rpm-track { display: block; height: max(10px, min(6cqh, 3cqw, 22px)); }
-.widget[data-variant="lights"] .rpm-lights { display: flex; }
-
-@keyframes rpm-flash { 50% { opacity: 0.4; } }
-
-/* ---- gear and speed ---- */
-.gear-hint { margin-top: calc(6 * var(--u)); font-family: var(--mono); font-size: max(10px, min(10cqh, 6cqw, 22px)); color: var(--muted); }
+/* ---- speed ---- */
 .speed-row { display: flex; align-items: baseline; gap: calc(8 * var(--u)); }
 .unit { font-size: max(10px, min(10cqh, 6cqw, 22px)); color: var(--muted); }
 
@@ -604,8 +592,7 @@ td.best { color: var(--best); font-weight: 600; }
   .widget { grid-column: span 2 !important; grid-row: auto !important; min-height: calc(84 * var(--u)); }
   .w-delta { order: 1; }
   .w-currentLap { order: 2; }
-  .w-gear, .w-speed { grid-column: span 1 !important; order: 3; }
-  .w-rpm { order: 4; }
+  .w-rpmGear, .w-speed { grid-column: span 1 !important; order: 3; }
   .w-sectors { order: 5; }
   .w-lastLap, .w-bestLap { grid-column: span 1 !important; order: 6; }
   .w-predicted { order: 7; }

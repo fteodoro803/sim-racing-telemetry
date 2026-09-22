@@ -8,7 +8,7 @@
 // other or to the data source, which is what will let them be added, removed and moved later.
 
 import { drawChart } from './charts.js';
-import { deltaClass, el, setClass, setText } from './dom.js';
+import { deltaClass, el, setClass, setText, svgEl } from './dom.js';
 import { fmtDelta, fmtLap, fmtSector } from './format.js';
 import { tyreZone } from './tyre-color.js';
 
@@ -253,31 +253,70 @@ const lapTable = {
 
 // ---- Driving -------------------------------------------------------------------------------
 
-const RPM_LIGHTS = 12;   // shift-light segments shown once the widget is tall enough (design/Widget Responsive Behavior.dc.html, 2d)
+const RG_LIGHTS = 12;   // shift-light segments (design/Widget Responsive Behavior.dc.html, "RPM + Gear (combined)")
+// The ring's background/progress arc: a 270° sweep (radius 42 around a 100x100 viewBox), open at the
+// bottom, traced clockwise from bottom-left to bottom-right over the top - see the design file.
+const RG_RING_D = 'M 20.3 79.7 A 42 42 0 1 1 79.7 79.7';
 
-const rpm = {
-  title: 'RPM',
-  noLabel: true,   // the label sits inline with the value; layout (and whether the bar/lights show) is CSS, by container size
+/** Zone for an rpm value against the warning/limiter thresholds: '', 'warn' or 'limit'. */
+function rpmZone(value, warnRpm, limiter) {
+  return value >= limiter * 0.98 ? 'limit' : value >= warnRpm ? 'warn' : '';
+}
+
+const rpmGear = {
+  title: 'RPM + Gear',
+  noLabel: true,   // no title bar - the gear digit and "RPM" label carry the widget's identity, per the design
   build(body) {
-    const row = el('div', 'rpm-row');
-    const label = el('div', 'w-label rpm-label', 'RPM');
-    const value = el('div', 'v v-md accent rpm-value');
-    const track = el('div', 'rpm-track');
-    const fill = el('div', 'rpm-fill');
-    const warn = el('div', 'rpm-mark');
-    const limit = el('div', 'rpm-mark limit');
-    track.append(fill, warn, limit);
-    const lights = el('div', 'rpm-lights');
-    for (let i = 0; i < RPM_LIGHTS; i++) lights.append(el('div', 'rpm-light'));
-    row.append(label, value, track, lights);
-    body.append(row);
-    return { value, fill, warn, limit, lights: Array.from(lights.children) };
+    const wrap = el('div', 'rg');
+
+    const gearRow = el('div', 'rg-gear-row');
+    const gearValue = el('div', 'rg-gear');
+    const gearHint = el('div', 'rg-hint');
+    gearRow.append(gearValue, gearHint);
+
+    const rpmRow = el('div', 'rg-rpm-row');
+    const rpmLabel = el('div', 'rg-rpm-label', 'RPM');
+    const rpmValue = el('div', 'rg-rpm-value');
+    rpmRow.append(rpmLabel, rpmValue);
+
+    const lights = el('div', 'rg-lights');
+    for (let i = 0; i < RG_LIGHTS; i++) lights.append(el('div', 'rg-light'));
+
+    const ring = el('div', 'rg-ring');
+    const svg = svgEl('svg', { viewBox: '0 0 100 100' });
+    const ringBg = svgEl('path', { d: RG_RING_D, class: 'rg-ring-bg' });
+    const ringFg = svgEl('path', { d: RG_RING_D, class: 'rg-ring-fg' });
+    svg.append(ringBg, ringFg);
+    const ringGear = el('div', 'rg-ring-gear');
+    ring.append(svg, ringGear);
+    // The dash math needs the path's real drawn length, which only a live path can report.
+    const ringLen = ringFg.getTotalLength();
+    ringFg.style.strokeDasharray = `${ringLen} ${ringLen}`;
+
+    wrap.append(gearRow, rpmRow, lights, ring);
+    body.append(wrap);
+    return { gearValue, gearHint, rpmValue, lights: Array.from(lights.children), ringFg, ringGear, ringLen };
   },
   update(r, { frame }) {
+    const gear = frame?.gear;
+    if (gear == null) {
+      setText(r.gearValue, DASH);
+      setText(r.ringGear, DASH);
+      setText(r.gearHint, NBSP);
+    } else {
+      // Zero is neutral; -1 is reverse (GT7 gives no direct signal for it, see bridge/frames.py).
+      const label = gear === 0 ? 'N' : gear === -1 ? 'R' : String(gear);
+      setText(r.gearValue, label);
+      setText(r.ringGear, label);
+      const suggested = frame.suggestedGear;
+      setText(r.gearHint, suggested > 0 && suggested !== gear ? `→ ${suggested}` : NBSP);
+    }
+
     if (!frame || frame.rpm == null) {
-      setText(r.value, DASH);
-      r.fill.style.width = '0%';
-      for (const light of r.lights) setClass(light, 'rpm-light');
+      setText(r.rpmValue, DASH);
+      for (const light of r.lights) setClass(light, 'rg-light');
+      r.ringFg.style.strokeDashoffset = `${r.ringLen}`;
+      r.ringFg.setAttribute('class', 'rg-ring-fg');   // SVG elements don't support plain `.className =` assignment
       return;
     }
     const limiter = frame.rpmLimiter > 0 ? frame.rpmLimiter : 9000;
@@ -286,42 +325,18 @@ const rpm = {
     // `revLimitAlert` is the game's own "actively bouncing off the limiter" bit; fall back to the
     // rpm/limiter threshold for cars or frames where that bit hasn't been confirmed reliable.
     const atLimit = frame.revLimitAlert || frame.rpm >= limiter * 0.98;
-    const level = atLimit ? 'limit' : frame.rpm >= warnRpm ? 'warn' : '';
-    setText(r.value, String(Math.round(frame.rpm)));
-    setClass(r.fill, `rpm-fill ${level} ${frame.revLimitAlert ? 'flash' : ''}`);
-    r.fill.style.width = `${Math.min(100, (frame.rpm / max) * 100).toFixed(1)}%`;
-    r.warn.style.left = frame.rpmWarning > 0 ? `${((frame.rpmWarning / max) * 100).toFixed(1)}%` : '-10%';
-    r.limit.style.left = `${((limiter / max) * 100).toFixed(1)}%`;
-    // Each segment represents an equal slice of the same 0..max range as the bar; it lights up once
-    // the rpm reaches its slice, in whichever zone (normal/warn/limit) that slice falls in.
+    const level = atLimit ? 'limit' : rpmZone(frame.rpm, warnRpm, limiter);
+    setText(r.rpmValue, String(Math.round(frame.rpm)));
+    // Each light is an equal slice of the same 0..max range as the ring/bar; it lights up once the
+    // rpm reaches its slice, in whichever zone (normal/warn/limit) that slice falls in.
     r.lights.forEach((light, i) => {
-      const segStart = (i / RPM_LIGHTS) * max;
+      const segStart = (i / RG_LIGHTS) * max;
       const lit = frame.rpm >= segStart;
-      const zone = segStart >= limiter * 0.98 ? 'limit' : segStart >= warnRpm ? 'warn' : '';
-      setClass(light, `rpm-light ${lit ? 'lit' : ''} ${zone}`);
+      setClass(light, `rg-light ${lit ? 'lit' : ''} ${rpmZone(segStart, warnRpm, limiter)}`);
     });
-  },
-};
-
-const gear = {
-  title: 'Gear',
-  build(body) {
-    const value = el('div', 'v v-huge accent');
-    const hint = el('div', 'gear-hint');
-    body.classList.add('center');
-    body.append(value, hint);
-    return { value, hint };
-  },
-  update(r, { frame }) {
-    if (!frame || frame.gear == null) {
-      setText(r.value, DASH);
-      setText(r.hint, NBSP);
-      return;
-    }
-    // Zero is neutral; -1 is reverse (GT7 doesn't signal reverse directly, see bridge/frames.py).
-    setText(r.value, frame.gear === 0 ? 'N' : frame.gear === -1 ? 'R' : String(frame.gear));
-    const suggested = frame.suggestedGear;
-    setText(r.hint, suggested > 0 && suggested !== frame.gear ? `→ ${suggested}` : NBSP);
+    const fraction = Math.min(1, frame.rpm / max);
+    r.ringFg.style.strokeDashoffset = `${r.ringLen * (1 - fraction)}`;
+    r.ringFg.setAttribute('class', `rg-ring-fg ${level} ${frame.revLimitAlert ? 'flash' : ''}`);
   },
 };
 
@@ -424,5 +439,5 @@ const tyres = {
 
 export const WIDGETS = {
   currentLap, delta, sectors, deltaChart, speedChart, lastLap, bestLap, predicted, lapTable,
-  rpm, gear, speed, pedals, tyres,
+  rpmGear, speed, pedals, tyres,
 };
