@@ -105,14 +105,6 @@ button, select, input { font: inherit; color: inherit; }
 }
 .btn:disabled { opacity: .4; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #0d1117; font-weight: 600; }
-.speed { display: flex; align-items: center; gap: calc(6 * var(--u)); color: var(--muted); }
-.speed select {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: calc(6 * var(--u));
-  padding: calc(6 * var(--u)) calc(8 * var(--u));
-  font-size: calc(12 * var(--u));
-}
 
 /* ---- grid and widget cards ---- */
 .grid {
