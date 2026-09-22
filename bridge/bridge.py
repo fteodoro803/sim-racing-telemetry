@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Relay GT7 telemetry from a PlayStation to the web page, and serve the page too.
 
-    python3 bridge/bridge.py --ps4-ip 192.168.1.20
+    python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP
 
 It asks the console for telemetry, decodes each packet into a frame, and broadcasts the frames over
 a WebSocket. It also serves the `web/` folder over http on the same port, so a tablet on your
@@ -15,14 +15,15 @@ To try it without a console:
 import argparse
 import json
 import socket
+import sys
 import threading
 import time
 from pathlib import Path
 
 from capture import capture, report
 from fake_console import FakeConsole
-from frames import to_frame
-from gt7 import HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT
+from frames import GameClock, make_frame
+from gt7 import HEARTBEAT_PORT, PACKET_SIZES, TELEMETRY_PORT, check_console_address
 from ws_server import Hub, make_server
 
 DEFAULT_WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -48,12 +49,14 @@ class Bridge:
         self.server = make_server(host, http_port, web_dir, self.hub, info, hello)
         self.port = self.server.server_address[1]
         self.stats = None
+        self.clock = GameClock()
+        self.error = None     # set if the capture stops because of an error, so the bridge can say so and exit
         self._stop = threading.Event()
         self._threads = []
 
     def _on_decoded(self, decoded, seconds):
         """Convert a decoded packet to a frame and broadcast it to every connected browser."""
-        frame = to_frame(decoded, seconds * 1000)
+        frame = make_frame(decoded, self.clock, seconds * 1000)
         self.hub.broadcast_frame(json.dumps({"type": "frame", **frame}, separators=(",", ":")))
 
     def _status_loop(self):
@@ -63,10 +66,16 @@ class Bridge:
                                            "frames": self.hub.frames}))
 
     def _capture_loop(self):
-        self.stats = capture(
-            self.console_ip, packet_type=self.packet_type, send_port=self.heartbeat_port,
-            recv_port=self.telemetry_port, out=self.record, say=self.say,
-            on_decoded=self._on_decoded, show_values=False, stop=self._stop)
+        """Run the console capture. If it fails (say the record folder can't be created, or a port is
+        taken), remember the error so the bridge can report it and stop, instead of carrying on serving
+        a page that will never receive anything."""
+        try:
+            self.stats = capture(
+                self.console_ip, packet_type=self.packet_type, send_port=self.heartbeat_port,
+                recv_port=self.telemetry_port, out=self.record, say=self.say,
+                on_decoded=self._on_decoded, show_values=False, stop=self._stop)
+        except Exception as err:   # noqa: BLE001 - any failure here should stop the bridge with a message
+            self.error = err
 
     def start(self):
         """Start serving, broadcasting and capturing in background threads."""
@@ -110,6 +119,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not args.ip and not args.fake_console:
         parser.error("give --ps4-ip, or --fake-console to try it without a console")
+    if args.ip:
+        try:
+            check_console_address(args.ip)
+        except ValueError as err:
+            parser.error(str(err))
 
     fake = None
     ip = args.ip
@@ -129,8 +143,8 @@ def main(argv=None):
         print(f"Open on your iPad:      http://{lan}:{bridge.port}   (same Wi-Fi network)", flush=True)
     print("Press Ctrl-C to stop.", flush=True)
     try:
-        while True:
-            time.sleep(1)
+        while bridge.error is None:
+            time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:
@@ -139,7 +153,11 @@ def main(argv=None):
             fake.stop()
         if bridge.stats:
             report(bridge.stats, args.packet_type, args.record)
+    if bridge.error is not None:
+        print(f"\nThe bridge stopped because of an error: {bridge.error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

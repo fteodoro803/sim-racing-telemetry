@@ -7,6 +7,7 @@ written up in GT7_TELEMETRY.md at the repo root; offsets and constants below com
 Only the type-A packet layout is decoded so far. Types B, `~` and C carry the same base layout
 plus extra fields at higher offsets that have not been confirmed yet.
 """
+import ipaddress
 import struct
 
 from salsa20 import salsa20_xor
@@ -29,6 +30,20 @@ FLAG_NAMES = (
     "car_on_track", "paused", "loading", "in_gear", "has_turbo", "rev_limit_alert",
     "handbrake", "lights", "high_beams", "low_beams", "asm_active", "tcs_active",
 )
+
+
+def check_console_address(value):
+    """Return `value` if it is an IP address, else raise ValueError with a message saying what to use.
+
+    Catches a pasted placeholder or a typo before it turns into an unhelpful network error later.
+    """
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        raise ValueError(
+            f"{value!r} is not an IP address. Use the PlayStation's address, from Settings > Network > "
+            "View Connection Status > IP Address (four numbers separated by dots).") from None
+    return value
 
 
 def heartbeat(packet_type="A"):

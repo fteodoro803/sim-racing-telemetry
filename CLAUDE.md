@@ -41,6 +41,10 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 
 **Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
 
+**Session persistence and export.** `web/persistence.js` (IndexedDB) and `web/session-file.js` (JSON export/import) build on `LapTracker#restoreSession` and its `onEvent` callback; keep both DOM-free of the tracker itself (they take a tracker instance, they don't reach into `app.js`'s state). See D20/O15 in `DECISIONS.md`.
+
+**Real-session fixture.** `bridge/tests/fixtures/gt7-ps4-session.jsonl.gz` is a real PS4 recording, replayed by `bridge/tests/test_real_session.py` and (via a cached decode, `npm run decode-fixture`) `tests/real-session.test.mjs`. Regenerate the cache after changing the decoder or the frame format.
+
 **Demo data is synthetic** and must stay labelled as such on the page. Regenerate `web/demo-laps.json` with `npm run demo-data`; commit the result.
 
 **Definition of done:**

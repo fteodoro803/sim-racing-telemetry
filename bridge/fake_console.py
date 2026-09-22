@@ -88,6 +88,7 @@ def build_packet(t, packet_id, *, lap_seconds=20.0, radius=200.0, paused=False):
     struct.pack_into("<f", p, 0x4C, speed)
     struct.pack_into("<4f", p, 0x60, 80.0, 82.0, 78.0, 79.0)         # tyre temps
     struct.pack_into("<i", p, 0x70, packet_id)
+    struct.pack_into("<i", p, 0x80, 55_800_000 + round(t * 1000))     # game clock: time of day in ms, 15:30 at the start
     struct.pack_into("<h", p, 0x74, 1 + int(laps_done))
     last = round(lap_seconds * 1000) if laps_done >= 1 else -1
     struct.pack_into("<2i", p, 0x78, last, last)                     # best, last lap

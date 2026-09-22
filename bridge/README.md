@@ -13,14 +13,15 @@ There is nothing to install: it uses only the Python 3 standard library.
 
 ## Run it
 
-1. Find the PS4's IP address: **Settings > Network > View Connection Status > IP Address**.
+1. Find the PS4's IP address: **Settings > Network > View Connection Status > IP Address**. Below,
+   `YOUR-PS4-IP` stands for that address; replace it with your own.
 2. Make sure the PS4 and this computer are on the same network (the same router, and not a guest
    network that isolates devices from each other).
 3. Start GT7 and get into a race, a time trial or free practice. Menus may send nothing.
 4. Start the bridge:
 
 ```bash
-python3 bridge/bridge.py --ps4-ip 192.168.1.20
+python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP
 ```
 
 It prints two addresses. Open the first in a browser on this computer; open the second on your iPad
@@ -48,7 +49,7 @@ python3 bridge/bridge.py --fake-console
 without the web page. Use it if nothing arrives, or to capture a session.
 
 ```bash
-python3 bridge/capture.py --ps4-ip 192.168.1.20 --out captures/first.jsonl.gz
+python3 bridge/capture.py --ps4-ip YOUR-PS4-IP --out captures/first.jsonl.gz
 ```
 
 Useful captures: a normal few laps; a session where you pause, restart and open a replay (this

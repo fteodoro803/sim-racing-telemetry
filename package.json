@@ -7,6 +7,7 @@
     "test": "node --test tests/",
     "demo-data": "python3 tools/make_demo.py",
     "serve": "python3 -m http.server 8000 -d web",
-    "test:bridge": "python3 -m unittest discover -s bridge/tests -v"
+    "test:bridge": "python3 -m unittest discover -s bridge/tests -v",
+    "decode-fixture": "python3 tools/decode_fixture.py"
   }
 }

@@ -9,6 +9,8 @@ import { DemoSource } from './demo-source.js';
 import { el, setClass, setText } from './dom.js';
 import { DEFAULT_LAYOUT } from './layout.js';
 import { LiveSource } from './live-source.js';
+import { clearSession, loadSession, saveSession } from './persistence.js';
+import { buildExport, downloadJson, exportFilename, readImport } from './session-file.js';
 import { LapTracker } from './timing.js';
 import { WIDGETS } from './widgets.js';
 
@@ -24,7 +26,19 @@ const storage = {
   set(key, value) { try { localStorage.setItem(key, value); } catch { /* not remembered */ } },
 };
 
-const tracker = new LapTracker();
+/**
+ * Persist completed laps as they happen, and only while live: the demo builds its own session
+ * every time, and saving its laps over a real one (or vice versa) would just be confusing. An
+ * auto-reset because the car doesn't match a restored session's track clears the save too, so a
+ * stale session for the wrong track isn't offered again next time.
+ */
+function onTrackerEvent(type, payload) {
+  if (app.mode !== 'live') return;
+  if (type === 'lap') saveSession(tracker);
+  else if (type === 'reset' && payload.reason === 'lost-reference') clearSession();
+}
+
+const tracker = new LapTracker({ onEvent: onTrackerEvent });
 const app = {
   mode: 'demo',              // 'demo' or 'live'
   servedByBridge: false,     // true when this page came from the bridge, so it can connect to itself
@@ -35,6 +49,7 @@ const app = {
   address: null,             // the bridge address in use
   frame: null,               // the latest frame from whichever source is active
   paused: false,             // demo only
+  imported: null,            // { source, exportedAt } of an imported file, while reviewing one
   theme: readTheme(),
   widgets: [],               // { def, refs } for each widget on the grid
 };
@@ -76,6 +91,7 @@ function stopLive() {
 async function startDemo() {
   stopLive();
   app.mode = 'demo';
+  app.imported = null;
   try {
     app.demo = new DemoSource(await loadDemoData());
   } catch (err) {
@@ -87,15 +103,43 @@ async function startDemo() {
   app.paused = false;
 }
 
-/** Connect to a bridge at `url` and start a fresh session from its frames. */
-function startLive(url) {
+/**
+ * Connect to a bridge at `url`, restoring a previously saved session if there is one.
+ *
+ * A restored session that turns out to be for a different track corrects itself: `tracker`'s own
+ * `onEvent` (below) clears the save once the car has stayed off the restored reference too long.
+ */
+async function startLive(url) {
   stopLive();
   app.mode = 'live';
+  app.imported = null;
   app.address = url;
-  resetSession();
+  const saved = await loadSession();
+  if (saved) tracker.restoreSession(saved);
+  else tracker.reset();
+  app.frame = null;
   app.connection = 'connecting';
   app.live = new LiveSource(url, { onFrame: ingest, onState: (state) => { app.connection = state; } });
   app.live.connect();
+}
+
+/**
+ * Load a session from an exported file for review: stops whatever source is running, so its frames
+ * can't mix with the imported laps, which otherwise sit in the tracker exactly like a live one's.
+ */
+function importSession(text) {
+  const session = readImport(text);   // throws a user-facing message if the file doesn't look right
+  const { source, exportedAt } = JSON.parse(text);
+  stopLive();
+  app.paused = true;
+  app.mode = 'imported';
+  app.imported = { source, exportedAt };
+  tracker.restoreSession(session);
+  app.frame = null;
+}
+
+function exportSession() {
+  downloadJson(buildExport(tracker, { source: app.mode === 'imported' ? app.imported?.source ?? 'live' : app.mode }), exportFilename());
 }
 
 // ---- grid ------------------------------------------------------------------
@@ -144,6 +188,10 @@ function describeStatus() {
     if (app.demo?.done) return { text: 'Demo finished. Press Replay to watch it again.', tone: 'muted' };
     return { text: 'Simulated data', tone: 'muted' };
   }
+  if (app.mode === 'imported') {
+    const when = app.imported?.exportedAt ? new Date(app.imported.exportedAt).toLocaleString() : '';
+    return { text: `Imported session (${tracker.laps.length} laps)${when ? ` · exported ${when}` : ''}`, tone: 'muted' };
+  }
   switch (app.connection) {
     case 'connecting': return { text: 'Connecting to bridge…', tone: 'muted' };
     case 'waiting': return { text: 'Connected. Waiting for GT7. Start a race or time trial.', tone: 'warn' };
@@ -174,8 +222,10 @@ function renderChrome() {
   setText($('statusText'), status.text);
   setClass($('statusText'), `status ${status.tone === 'warn' || status.tone === 'bad' ? status.tone : ''}`);
   setClass($('statusDot'), `dot ${status.tone}`);
-  setText($('sourceBadge'), app.mode === 'live' ? 'LIVE' : 'DEMO');
+  setText($('sourceBadge'), app.mode === 'live' ? 'LIVE' : app.mode === 'imported' ? 'IMPORTED' : 'DEMO');
   setClass($('sourceBadge'), `badge ${app.mode === 'live' ? 'live' : ''}`);
+  setText($('exportBtn'), app.mode === 'imported' ? 'Re-export' : 'Export');
+  $('exportBtn').disabled = tracker.laps.length === 0;
   $('demoControls').hidden = app.mode !== 'demo';
   setText($('playBtn'), app.demo?.done ? 'Replay' : app.paused ? 'Play' : 'Pause');
 
@@ -257,6 +307,19 @@ function wireControls() {
     if (app.demo?.done) startDemo(); else app.paused = !app.paused;
   });
   $('restartBtn').addEventListener('click', () => startDemo());
+
+  $('exportBtn').addEventListener('click', () => exportSession());
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async () => {
+    const [file] = $('importFile').files;
+    $('importFile').value = '';   // so choosing the same file again still fires 'change'
+    if (!file) return;
+    try {
+      importSession(await file.text());
+    } catch (err) {
+      alert(err.message);   // rare and user-caused (wrong file); a modal is fine, no dedicated UI for it
+    }
+  });
 }
 
 // ---- main loop -------------------------------------------------------------
