@@ -34,7 +34,14 @@ tests/    node --test tests/  (the web side)
 `web/` is plain static files with relative paths and no build step, so it can be served from
 `/lab/<id>/`. Only `web/` is published. Its main pieces: `layout.js` (the 12×8 grid and where each
 widget sits), `widgets.js` (one definition per widget), `timing.js` (the lap tracker), the two data
-sources `demo-source.js` and `live-source.js`, and `app.js`, which wires them together.
+sources `demo-source.js` and `live-source.js`, `persistence.js` and `session-file.js` (saving,
+restoring, exporting and importing a session), and `app.js`, which wires them together.
+
+A live session's completed laps are saved to the browser's IndexedDB as each one finishes, and
+restored the next time you connect, so a refresh or a dropped connection doesn't lose them. If the
+restored laps turn out to be for a different track, the tracker notices on its own and starts fresh.
+Export and Import in the top bar save a session to a JSON file and load one back, for either the
+demo or a live session.
 
 ## Run it
 

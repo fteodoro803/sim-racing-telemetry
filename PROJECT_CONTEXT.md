@@ -34,8 +34,8 @@ A separate Lab entry, a personal log of modified GT7 cars and their times on spe
 4. **Browser localhost behaviour is untested.** Check an https page connecting to `ws://localhost` in Chrome, Firefox and Safari early (Safari has been stricter; Chrome is adding a local-network-access prompt).
 5. **Interrupted-lap handling is partly confirmed.** Frames flagged paused, loading or off-track are dropped and the lap invalidated ([D7](DECISIONS.md), [O11](DECISIONS.md)). Two real sessions confirmed that the pause flag is set while the game is paused, that packets keep arriving with the game clock standing still, that laps containing a pause are correctly excluded, and (from a clean second session) that consecutive unpaused laps track the game's own lap times closely (within about 20 ms) with normal delta noise around 0.7 ms. Still to do: record a restart and a replay to see what those look like, fix the rules if needed, and turn a clean capture into a committed test fixture. Done: `bridge/tests/fixtures/gt7-ps4-session.jsonl.gz`, a real PS4 recording with a session restart, three clean unpaused laps and a pause, replayed by both suites (`bridge/tests/test_real_session.py`, `tests/real-session.test.mjs`). Also open: [O2](DECISIONS.md).
 6. **The decoder must pass `paused`, `loading` and `onTrack` through on each frame** (GT7 flag bits 1, 2 and 0). Packet type C also carries `currentLap`, which could cross-check the tracker's own elapsed time.
-7. **Laps aren't persisted.** A refresh loses the session. Done = completed laps survive a reload (IndexedDB).
-8. **No session export/import.** Done = a session's laps (`timeMs`, time and progress samples, channels) round-trip through a JSON file.
+7. ~~**Laps aren't persisted.**~~ **Resolved** ([D20](DECISIONS.md)). A refresh or a dropped connection used to lose the session. Completed laps are now saved to IndexedDB as each one finishes (`web/persistence.js`) and restored on the next live connection (`LapTracker#restoreSession`). Live sessions only; the demo builds its own every time. If the restored laps turn out to be for a different track, the tracker notices on its own (persistently off the reference line) and starts over, clearing the stale save too.
+8. ~~**No session export/import.**~~ **Resolved** ([D20](DECISIONS.md)). Export and Import buttons in the top bar (`web/session-file.js`) save a session's laps to a JSON file and load one back, for review; importing pauses whatever source is running and shows the file's laps in the same dashboard. There's no dedicated Review view yet (Future directions), so an imported session looks like a live one with no new frames arriving.
 9. **Track map and user-defined sector splits** ([D5](DECISIONS.md), [D6](DECISIONS.md)). Sectors are currently fixed thirds of the lap. Done = draw the reference line as a map, click to add a split at the nearest point on the line (stored as a fraction of the lap), drag or delete splits, persist them per track. Groundwork exists: sector times are derived from stored samples ([O6](DECISIONS.md)) and split markers already draw on the charts. Needs a way to identify tracks ([O3](DECISIONS.md)) and will get its own `TRACK_MAP_PLAN.md`. Check whether GT7's axes need a flip so the map isn't mirrored.
 10. **Portfolio side (outside this repo).** Replace the placeholder `lap-sim` entry in the portfolio's `lab-tools.json` with the entry in the [README](README.md), then run the deploy workflow.
 11. **No customisable dashboard.** The page is one fixed layout. Wanted ([D11](DECISIONS.md)): users choose which widgets are on screen and snap them into a grid, with a few basic presets and a "Custom" layout they build themselves, since not everyone wants the same things. Done = a widget registry (each widget declares the channels it needs), an edit mode with an add-widget palette and drag/resize on a snapping grid, layouts saved locally, the presets, and the existing panels (readouts, sector cards, charts, lap table) rebuilt as widgets whose default layout looks as the page does today. The phone layout collapses to a single column. Library or hand-rolled: [O13](DECISIONS.md). Design and grid spec: [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md).
@@ -46,6 +46,15 @@ A separate Lab entry, a personal log of modified GT7 cars and their times on spe
 
 <!-- Resolved items are struck through and annotated, not deleted:
      1. ~~**Title.**~~ **Resolved** (`DECISIONS.md` D#). What changed, in a line or two. -->
+
+## Data model note
+
+Two `LapTracker` methods now build a session from outside a live stream of frames, both used by
+persistence and import/export: `reset(reason)` clears everything and says why (`'manual'` or
+`'lost-reference'`); `restoreSession({ laps, splits, compareMode })` rebuilds the reference line from
+the first restored lap and continues from there, exactly as importing a mid-session reconnect. An
+`onEvent(type, payload)` callback (`'lap'`, `'reset'`, `'restore'`) lets a caller react without
+polling every frame.
 
 ## Future directions (deferred — not scoped, not started)
 

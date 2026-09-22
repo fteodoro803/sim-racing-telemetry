@@ -353,3 +353,127 @@ test('an implausible game lap time is not trusted, so pinning does not use it ei
   assert.notEqual(tr.laps[1].timeMs, 45037);
   assert.notEqual(tr.cur.startT, tr.laps[1].startT + 45037);
 });
+
+// ---- events: onEvent notifications ------------------------------------------------------------
+
+test('onEvent fires "lap" with the finished lap, in order, and "reset" with a reason', () => {
+  const events = [];
+  const tr = new LapTracker({ onEvent: (type, payload) => events.push({ type, payload }) });
+  const src = new DemoSource(data);
+  while (!src.done) tr.ingest(src.frame(src.index++));
+
+  const lapEvents = events.filter((e) => e.type === 'lap');
+  assert.equal(lapEvents.length, tr.laps.length);
+  assert.deepEqual(lapEvents.map((e) => e.payload.lap.id), tr.laps.map((l) => l.id));
+  assert.equal(lapEvents.at(-1).payload.lap, tr.laps.at(-1));   // the actual stored lap object, not a copy
+
+  events.length = 0;
+  tr.reset();
+  assert.deepEqual(events, [{ type: 'reset', payload: { reason: 'manual' } }]);
+});
+
+test('the constructor never fires onEvent for its own initial (empty) state', () => {
+  const events = [];
+  new LapTracker({ onEvent: (type) => events.push(type) });
+  assert.deepEqual(events, []);
+});
+
+// ---- restoreSession -----------------------------------------------------------------------------
+
+test('restoreSession rebuilds the reference from the first restored lap and continues timing from there', () => {
+  const clean = runDemo();
+  const keep = clean.laps.slice(0, -2);                  // restore all but the last two laps...
+  const rest = clean.laps.slice(-2);                     // ...then drive through them again from scratch
+  const saved = { laps: keep.map((l) => ({ ...l })), splits: clean.splits, compareMode: 'last' };
+
+  const events = [];
+  const tr = new LapTracker({ onEvent: (type, payload) => events.push({ type, payload }) });
+  tr.restoreSession(saved);
+
+  assert.equal(tr.laps.length, keep.length);
+  assert.deepEqual(tr.laps.map((l) => l.timeMs), keep.map((l) => l.timeMs));
+  assert.deepEqual(tr.laps.map((l) => l.id), keep.map((_, i) => i + 1));   // renumbered fresh
+  assert.equal(tr.compareMode, 'last');
+  // Close, not identical: a stored lap already carries its closing sample (appended after the
+  // original reference was built from the same lap), so rebuilding from it threads one extra
+  // point through the loop. Negligible for timing (well under 1 m over a ~3 km lap).
+  assert.ok(Math.abs(tr.ref.length - clean.ref.length) < 5, `ref length ${tr.ref.length} vs ${clean.ref.length}`);
+  assert.deepEqual(events, [{ type: 'restore', payload: { laps: keep.length } }]);
+
+  // Continues timing, but the lap in progress when a session is restored is always "joined
+  // mid-lap" (its start is unknown, see restoreSession's own doc comment) - even feeding frames
+  // starting exactly on a crossing doesn't change that, since there's no `cur` yet to notice it.
+  // So the first lap fed after a restore is never recorded; the one after that is.
+  const [skipped, recovered] = rest;
+  const src = new DemoSource(data);
+  src.feedUntilLap(skipped.n, () => {});
+  while (!src.done && tr.laps.length < clean.laps.length - 1) tr.ingest(src.frame(src.index++));
+  assert.deepEqual(tr.laps.slice(keep.length).map((l) => l.n), [recovered.n]);
+  assert.equal(tr.laps.at(-1).timeMs, recovered.timeMs);
+});
+
+test('restoreSession with no laps starts a clean, empty session', () => {
+  const tr = runDemo();
+  assert.ok(tr.laps.length > 0);
+  tr.restoreSession({ splits: [0.5], compareMode: 'last' });
+  assert.equal(tr.laps.length, 0);
+  assert.equal(tr.ref, null);
+  assert.deepEqual(tr.splits, [0.5]);
+  assert.equal(tr.compareMode, 'last');
+});
+
+test('restoring an empty session (no laps key at all) is a no-op-safe reset', () => {
+  const tr = runDemo();
+  tr.restoreSession();
+  assert.equal(tr.laps.length, 0);
+  assert.equal(tr.ref, null);
+});
+
+// ---- losing the reference: auto-reset after a persistent mismatch -----------------------------
+
+test('staying far off a restored reference for a while triggers an automatic reset', () => {
+  const clean = runDemo();
+  const saved = { laps: clean.laps.map((l) => ({ ...l })) };
+
+  const events = [];
+  const tr = new LapTracker({ onEvent: (type, payload) => events.push({ type, payload }) });
+  tr.restoreSession(saved);
+
+  // The very first frame after a restore only opens a non-recording "joined mid-lap" placeholder
+  // (its lap number is unknown to have started); a lap change is needed before anything actually
+  // records samples, exactly as it would for a real reconnect mid-lap.
+  tr.ingest({ t: 0, lap: 900, x: 1_000_000, z: 1_000_000, speed: 50, throttle: 0, brake: 0 });
+  tr.ingest({ t: 20, lap: 901, x: 1_000_000, z: 1_000_000, speed: 50, throttle: 0, brake: 0 });
+  // Now recording lap 901, feed frames miles from the restored reference for longer than
+  // LOST_REFERENCE_RESET_MS (5000 ms), well outside the flags' "held" gap-skip path.
+  let resetAt = null;
+  for (let t = 40; t <= 6000 && resetAt === null; t += 20) {
+    tr.ingest({ t, lap: 901, x: 1_000_000 + t, z: 1_000_000, speed: 50, throttle: 0, brake: 0 });
+    if (events.some((e) => e.type === 'reset' && e.payload.reason === 'lost-reference')) resetAt = t;
+  }
+  assert.ok(resetAt !== null, 'expected an automatic reset');
+  assert.ok(resetAt >= 5000, `reset fired too early, at t=${resetAt}`);
+  assert.equal(tr.laps.length, 0);
+  assert.equal(tr.ref, null);
+
+  // Recovers: a normal lap driven after the reset builds a fresh reference, same as any fresh start.
+  // feedUntilLap(2, ...) alone stops right at the start of lap 2, before that crossing (which is what
+  // closes lap 1 and builds the reference) is actually fed in; go one lap further to be sure it lands.
+  const src = new DemoSource(data);
+  src.feedUntilLap(3, (f) => tr.ingest(f));
+  assert.ok(tr.ref);
+  assert.ok(tr.ref.length > 500);
+});
+
+test('brief excursions off a restored reference do not trigger a reset', () => {
+  const clean = runDemo();
+  const tr = new LapTracker();
+  tr.restoreSession({ laps: clean.laps.map((l) => ({ ...l })) });
+  const src = new DemoSource(data);
+  // Replay a real lap's worth of driving on top of the restored session: normal telemetry noise and
+  // the LOST_DISTANCE_M-level jitter this already tolerates should never accumulate into a reset.
+  src.feedUntilLap(2, () => {});
+  while (!src.done && src.lapAt[src.index] === 2) tr.ingest(src.frame(src.index++));
+  assert.ok(tr.ref);   // still the restored reference, never cleared
+  assert.ok(tr.laps.length >= clean.laps.length);
+});

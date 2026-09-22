@@ -15,6 +15,7 @@ const PROJECT_BACK_M = 15;     // how far behind we still look, to tolerate smal
 const LOST_DISTANCE_M = 80;    // further than this from the line: hold progress, don't guess
 const MAX_CROSSING_GAP_M = 100; // a frame further than this from the line can't be used to place the crossing
 const LAP_TIME_TOLERANCE_MS = 1500; // a game-reported lap time this far from our own estimate isn't trusted
+const LOST_REFERENCE_RESET_MS = 5000; // this long continuously off the reference line: assume a different track and start over
 
 export const DEFAULT_SPLITS = [1 / 3, 2 / 3];
 
@@ -107,21 +108,39 @@ function lerpFrame(a, b, f) {
  * Feed frames in order to `ingest`, then read results from `laps`, `live` and the derived-state
  * methods. The first full lap becomes the reference line (see the file header); a lap that
  * starts mid-session, or is interrupted, is handled as described on `ingest`.
+ *
+ * Pass `onEvent(type, payload)` to be told about `'lap'` (a lap just finished), `'reset'` (the
+ * session was cleared; `payload.reason` is `'manual'` or `'lost-reference'`, see `ingest`) and
+ * `'restore'` (`restoreSession` loaded saved or imported laps). A caller uses this to persist
+ * completed laps as they happen, without polling the tracker every frame.
  */
 export class LapTracker {
-  constructor({ splits = DEFAULT_SPLITS, compareMode = 'best' } = {}) {
+  constructor({ splits = DEFAULT_SPLITS, compareMode = 'best', onEvent = null } = {}) {
     this.splits = splits.slice();
     this.compareMode = compareMode;
-    this.reset();
+    this._onEvent = onEvent;
+    this._initState();
   }
 
-  /** Forget everything, including the frame-stream clock state. */
-  reset() {
+  /** Tell the caller something happened, if it asked to be told. */
+  _notify(type, payload) {
+    this._onEvent?.(type, payload);
+  }
+
+  /** Set up a blank tracker: the frame-stream clock state, plus an empty session. */
+  _initState() {
     this.clockOffset = 0;
     this.gapStart = null;
     this.hold = null;
     this._seenLastLap = null;
+    this._lostSince = null;      // frame time the car started reading as off the reference, or null
     this._clearSession();
+  }
+
+  /** Forget everything, including the frame-stream clock state, and say why (default: asked to). */
+  reset(reason = 'manual') {
+    this._initState();
+    this._notify('reset', { reason });
   }
 
   /**
@@ -138,6 +157,26 @@ export class LapTracker {
     this.live = null;
     this._deltaCache = null;
     this._bestSectorsCache = null;
+  }
+
+  /**
+   * Replace the session with previously-saved laps, from persistence or an imported file.
+   *
+   * Rebuilds the reference line from the first lap, exactly as a fresh session would from a driven
+   * one. The lap in progress when the data was saved isn't restored (its start is unknown), so
+   * timing resumes at the next line crossing, the same as joining a session mid-lap. If the laps
+   * turn out not to match what the car actually does next (for example a different track), `ingest`
+   * notices and starts over on its own; see `LOST_REFERENCE_RESET_MS`.
+   */
+  restoreSession({ laps, splits, compareMode } = {}) {
+    this._initState();
+    if (Array.isArray(laps) && laps.length) {
+      this.laps = laps.map((lap, i) => ({ ...lap, id: i + 1 }));
+      this.ref = buildReference(this.laps[0]);
+    }
+    if (Array.isArray(splits)) this.setSplits(splits);
+    if (compareMode) this.compareMode = compareMode;
+    this._notify('restore', { laps: this.laps.length });
   }
 
   // ---- configuration -------------------------------------------------------
@@ -321,8 +360,27 @@ export class LapTracker {
     }
     if (f.lastLap > 0) this._seenLastLap = f.lastLap;
 
-    // 5. Record a sample for the lap in progress
-    if (this.cur.recording) this._addSample(f, f.t - this.cur.startT);
+    // 5. Record a sample for the lap in progress, and notice if we seem to be on the wrong track
+    if (this.cur.recording) {
+      const held = this._addSample(f, f.t - this.cur.startT);
+      if (this.ref && held !== undefined) {
+        if (!held) {
+          this._lostSince = null;
+        } else if (this._lostSince === null) {
+          this._lostSince = f.t;
+        } else if (f.t - this._lostSince >= LOST_REFERENCE_RESET_MS) {
+          // The car has stayed far from the reference line for a while (most likely a restored or
+          // imported session for a different track than the one now being driven): keep projecting
+          // onto a line that doesn't match would just be noise, so start over instead.
+          this._initState();
+          this._openLap(f.lap, false, f.t, f);
+          this.prev = f;
+          this._updateLive(f);
+          this._notify('reset', { reason: 'lost-reference' });
+          return;
+        }
+      }
+    }
     if (!f.gameClock) this.cur.gameClock = false;
     this.prev = f;
 
@@ -359,16 +417,21 @@ export class LapTracker {
    * With a reference line, progress comes from projecting the car onto it: held if the car is too
    * far from the line to trust, and never allowed to go backwards. Without one this is the
    * reference lap itself, and progress is the distance travelled along its own path.
+   *
+   * Returns whether the sample was held for being too far off the reference (`ingest` uses this to
+   * notice a persistently bad match, e.g. a different track), or `undefined` for a duplicate/late
+   * sample that was skipped, which carries no information either way.
    */
   _addSample(f, t) {
     const c = this.cur;
     // If the crossing was placed exactly on this frame, the opening sample already covers it.
-    if (t <= c.t[c.t.length - 1]) return;
-    let p;
+    if (t <= c.t[c.t.length - 1]) return undefined;
+    let p, held = false;
     if (this.ref) {
       const hit = project(this.ref, f.x, f.z, c.seg);
       if (hit.off > LOST_DISTANCE_M) {
         p = c.lastP;
+        held = true;
       } else {
         c.seg = hit.seg;
         p = Math.max(hit.p, c.lastP);
@@ -381,6 +444,7 @@ export class LapTracker {
     }
     c.lastP = p;
     this._push(f, t, p);
+    return held;
   }
 
   /**
@@ -451,6 +515,7 @@ export class LapTracker {
     lap.speed.push(xf.speed); lap.throttle.push(xf.throttle); lap.brake.push(xf.brake);
     lap.x.push(xf.x); lap.z.push(xf.z);
     this.laps.push(lap);
+    this._notify('lap', { lap });
   }
 
   /**

@@ -27,6 +27,7 @@ When an open item is decided: move it to the Decided log with a one-line rationa
 | D8 | **Laps driven through the pit lane are not handled.** Not worth the complexity; a slow pit lap simply counts as a slow lap. No work created. | This file only |
 | D9 | **The `outline-style-comments` convention applies to all code in the repo, including code written before the convention was adopted.** | [`CLAUDE.md`](CLAUDE.md) Conventions |
 | D10 | **Docs in use: `DECISIONS`, `BUGS`, `PROJECT_CONTEXT`, `FEATURE_MAP`.** A design-system doc and an architecture-map doc are skipped (the tool is small; the README covers layout). A `TRACK_MAP_PLAN.md` will be added when the track-map pass starts. | [`CLAUDE.md`](CLAUDE.md) "Project docs" |
+| D20 | **Completed laps persist to IndexedDB in live mode, and a session can be exported to and imported from a JSON file.** Resolves Known issues 7 and 8. Mechanism details: [O15](DECISIONS.md). | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issues 7-8; `web/persistence.js`, `web/session-file.js` |
 | D11 | **The dashboard is snap-to-grid: widgets snap into place, with a few basic presets plus a "Custom" layout the user builds.** Not everyone wants the same things on screen. Free-form pixel placement was rejected because layouts break on other screen sizes. (was O12) | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issue 11; [`FEATURE_MAP.md`](FEATURE_MAP.md) |
 | D12 | **Tyres are shown as graphics that change colour with temperature, with no numeric labels.** The colour ranges need real data and are deferred to their own dedicated pass. | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Future directions; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
 | D13 | **The first proper version covers all the Driving and Timing details, fed by real GT7 data so it can be tested on the author's own console.** Tyres, fuel and analysis features come later. | [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) Known issues 1–6, 12–13; [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) |
@@ -118,6 +119,26 @@ Drag and resize on a grid is real work, and a phone needs a single-column fallba
 *Recommendation:* hand-roll first. A layout is small (widget id, position, size), so save it to `localStorage` and allow export and import as JSON alongside session export. Revisit if touch dragging gets fiddly.
 
 ---
+
+## Open — judgement calls awaiting ratification (session persistence and export)
+
+**O15. Persist to IndexedDB, live sessions only, save-per-lap, and auto-recover from a stale reference.**
+Known issues 7 and 8 asked for persistence and export/import without specifying the mechanism.
+Judgement calls made building them:
+- **IndexedDB, not localStorage.** A session's samples can run to a few hundred KB per lap; IndexedDB's
+  quota is much larger and it stores structured data directly rather than JSON text.
+- **Persisted only in live mode, on each completed lap.** The demo builds its own deterministic session
+  every time, so saving its laps (or restoring old ones into it) would be confusing; only completed
+  laps are saved, not the one in progress, so a crash loses at most the current lap.
+- **A restored session for the wrong track is dropped automatically.** If the car stays more than
+  `LOST_REFERENCE_RESET_MS` (5000 ms) off the restored reference line while a lap is recording, the
+  tracker clears itself and the stale save, rather than silently mistiming a different track. This
+  reuses the existing off-reference tolerance (`LOST_DISTANCE_M`), not real track identification
+  (which is still O3, deliberately not tackled here).
+- **Import pauses the current source and reuses the live dashboard**, rather than a dedicated Review
+  view (not built yet; see Future directions in `PROJECT_CONTEXT.md`).
+
+Ratify or overturn each; ratified items move to Decided.
 
 ## How to use this file
 
