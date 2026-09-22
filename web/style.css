@@ -302,6 +302,10 @@ button, select, input { font: inherit; color: inherit; }
 .pedal-row { flex: 1; display: flex; justify-content: space-around; align-items: stretch; gap: calc(16 * var(--u)); min-height: 0; padding-top: calc(8 * var(--u)); }
 .pedal {
   container-type: inline-size;   /* one of 3 columns (or, flipped, one of 3 rows): its own box, not the whole Pedals card */
+  /* equal, definite width regardless of content - without this the track's cqw-based width (below)
+     and the column's own content-based width form a cyclic dependency that CSS resolves by
+     collapsing the column to 0, leaving the track stuck at its minimum */
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
