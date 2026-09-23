@@ -6,10 +6,12 @@
 
 import { readTheme } from './charts.js';
 import { DemoSource } from './demo-source.js';
-import { currentLayout, loadState, resetActivePreset, saveAsCustom, saveState, switchPreset } from './dashboard-state.js';
+import {
+  currentLayout, loadState, resetActivePreset, saveAsCustom, savePresetEdit, saveState, switchPreset,
+} from './dashboard-state.js';
 import { el, setClass, setText } from './dom.js';
 import { buildEditChrome, wireEditMode } from './edit.js';
-import { PRESET_LAYOUTS, WIDGET_META } from './layout.js';
+import { WIDGET_META } from './layout.js';
 import { LiveSource } from './live-source.js';
 import { clearSession, loadSession, saveSession } from './persistence.js';
 import { buildExport, downloadJson, exportFilename, readImport } from './session-file.js';
@@ -54,7 +56,7 @@ const app = {
   imported: null,            // { source, exportedAt } of an imported file, while reviewing one
   theme: readTheme(),
   widgets: [],               // { def, refs } for each widget on the grid
-  dashboard: loadState(),    // { presetId, custom } - which preset is showing, and Custom's saved layout
+  dashboard: loadState(),    // { presetId, custom, overrides } - which preset is showing, Custom's saved layout, and any built-in preset's saved edits
   editing: false,            // edit mode: dragging, resizing, adding and removing widgets
   draftLayout: null,         // the layout being edited, only while `editing`
 };
@@ -442,9 +444,9 @@ const editor = wireEditMode($('grid'), {
   },
 });
 
-/** Clone a preset's default layout, or Custom's saved one (blank if it has none yet). */
-function cloneOfPreset(presetId) {
-  return (presetId === 'custom' ? (app.dashboard.custom || []) : PRESET_LAYOUTS[presetId]).map((it) => ({ ...it }));
+/** Clone whatever's currently on screen for the active preset: its saved override or default, or Custom's saved layout. */
+function cloneOfPreset() {
+  return currentLayout(app.dashboard).map((it) => ({ ...it }));
 }
 
 function selectPreset(presetId) {
@@ -456,7 +458,7 @@ function selectPreset(presetId) {
 }
 
 function enterEditMode() {
-  app.draftLayout = cloneOfPreset(app.dashboard.presetId);
+  app.draftLayout = cloneOfPreset();
   app.editing = true;
   closeWidgetPicker();
   renderGrid(app.draftLayout, true);
@@ -465,12 +467,12 @@ function enterEditMode() {
   renderChrome();
 }
 
-/** "Done": a Custom edit is kept (and persisted); editing a built-in preset without saving as Custom is discarded. */
+/** "Done": the edit is kept and persisted, onto Custom or onto the built-in preset's own saved override (D32). */
 function doneEditing() {
-  if (app.dashboard.presetId === 'custom') {
-    app.dashboard = { ...app.dashboard, custom: app.draftLayout.slice() };
-    saveState(localStorage, app.dashboard);
-  }
+  app.dashboard = app.dashboard.presetId === 'custom'
+    ? { ...app.dashboard, custom: app.draftLayout.slice() }
+    : savePresetEdit(app.dashboard, app.draftLayout);
+  saveState(localStorage, app.dashboard);
   app.editing = false;
   app.draftLayout = null;
   closeWidgetPicker();
@@ -479,11 +481,11 @@ function doneEditing() {
   renderChrome();
 }
 
-/** "Reset to preset": Custom goes back to blank; a built-in preset just re-clones its own fixed default. */
+/** "Reset to default": Custom goes back to blank; a built-in preset drops its saved override back to its shipped default. */
 function resetEditLayout() {
   app.dashboard = resetActivePreset(app.dashboard);
-  if (app.dashboard.presetId === 'custom') saveState(localStorage, app.dashboard);
-  app.draftLayout = cloneOfPreset(app.dashboard.presetId);
+  saveState(localStorage, app.dashboard);
+  app.draftLayout = cloneOfPreset();
   renderGrid(app.draftLayout, true);
   renderPalette();
 }
@@ -566,6 +568,9 @@ function renderChrome() {
     setClass(tab, `preset-tab ${active ? 'active' : ''}`);
   }
   $('customDot').hidden = !app.dashboard.custom;
+  $('timingDot').hidden = !app.dashboard.overrides?.timing;
+  $('drivingDot').hidden = !app.dashboard.overrides?.driving;
+  $('everythingDot').hidden = !app.dashboard.overrides?.everything;
 }
 
 /** Update every widget and the top bar from the current state. Cheap enough to run every animation frame. */

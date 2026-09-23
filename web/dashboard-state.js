@@ -1,15 +1,19 @@
-// Which preset is active, and Custom's saved layout: the model behind the preset switcher and edit
-// mode (DASHBOARD_PLAN.md section 8). No DOM here, so it can be tested without a browser; the
-// storage backend is passed in, the same pattern as web/persistence.js.
+// Which preset is active, Custom's saved layout, and any edits saved onto a built-in preset: the
+// model behind the preset switcher and edit mode (DASHBOARD_PLAN.md section 8). No DOM here, so it
+// can be tested without a browser; the storage backend is passed in, the same pattern as
+// web/persistence.js.
 //
-// A "state" is { presetId, custom }: `custom` is the saved Custom layout, or null before the user
-// has ever added anything to it (D24 in DECISIONS.md - Custom starts blank, not as a copy of a
-// preset). Everything, Timing and Driving are fixed (layout.js's PRESET_LAYOUTS); only Custom is
-// ever saved.
+// A "state" is { presetId, custom, overrides }: `custom` is the saved Custom layout, or null before
+// the user has ever added anything to it (D24 in DECISIONS.md - Custom starts blank, not as a copy
+// of a preset). `overrides` is a { [presetId]: layout } map of user edits saved onto a built-in
+// preset (Everything, Timing or Driving) - each key is optional, and a preset with no override still
+// falls back to layout.js's PRESET_LAYOUTS (D32 in DECISIONS.md - presets are directly editable, with
+// "Reset to default" clearing the override back to that shipped layout).
 
 import { PRESET_IDS, PRESET_LAYOUTS } from './layout.js';
 
 const STORAGE_KEY = 'telemetry.dashboard';
+const BUILT_IN_IDS = PRESET_IDS.filter((id) => id !== 'custom');
 
 /** localStorage that never throws: it can be unavailable (private windows, blocked site data). */
 function readStorage(storage) {
@@ -31,38 +35,60 @@ export function isLayout(value) {
     && Number.isFinite(it.col) && Number.isFinite(it.row) && Number.isFinite(it.w) && Number.isFinite(it.h));
 }
 
-/** Load the remembered preset choice and Custom layout, or the defaults (Everything, Custom blank). */
+/** The saved `overrides` object with anything malformed - a bad key or a non-layout value - dropped. */
+function sanitizeOverrides(value) {
+  const overrides = {};
+  if (!value || typeof value !== 'object') return overrides;
+  for (const id of BUILT_IN_IDS) {
+    if (isLayout(value[id])) overrides[id] = value[id];
+  }
+  return overrides;
+}
+
+/** Load the remembered preset choice, Custom layout and preset overrides, or the defaults. */
 export function loadState(storage = globalThis.localStorage) {
   const saved = readStorage(storage);
   const presetId = saved && PRESET_IDS.includes(saved.presetId) ? saved.presetId : 'everything';
   const custom = saved && isLayout(saved.custom) ? saved.custom : null;
-  return { presetId, custom };
+  const overrides = sanitizeOverrides(saved?.overrides);
+  return { presetId, custom, overrides };
 }
 
-/** Persist the current preset choice and Custom layout. */
+/** Persist the current preset choice, Custom layout and preset overrides. */
 export function saveState(storage, state) {
-  writeStorage(storage, { presetId: state.presetId, custom: state.custom });
+  writeStorage(storage, { presetId: state.presetId, custom: state.custom, overrides: state.overrides });
 }
 
-/** The layout currently on screen: a built-in preset's fixed arrangement, or Custom's saved one (empty if none). */
+/** The layout currently on screen: a built-in preset's saved override (its shipped default if none), or Custom's saved one (empty if none). */
 export function currentLayout(state) {
-  return state.presetId === 'custom' ? (state.custom || []) : PRESET_LAYOUTS[state.presetId];
+  if (state.presetId === 'custom') return state.custom || [];
+  return state.overrides?.[state.presetId] || PRESET_LAYOUTS[state.presetId];
 }
 
-/** Switch which preset is showing. Does not change Custom's saved layout. */
+/** Switch which preset is showing. Does not change Custom's saved layout or any preset's override. */
 export function switchPreset(state, presetId) {
   return { ...state, presetId: PRESET_IDS.includes(presetId) ? presetId : state.presetId };
 }
 
 /** Save `layout` as Custom and switch to it - "Save as Custom" in edit mode. */
 export function saveAsCustom(state, layout) {
-  return { presetId: 'custom', custom: layout.slice() };
+  return { ...state, presetId: 'custom', custom: layout.slice() };
+}
+
+/** Save `layout` as the active built-in preset's own override - "Done" after editing it directly. */
+export function savePresetEdit(state, layout) {
+  if (state.presetId === 'custom') return state;
+  return { ...state, overrides: { ...state.overrides, [state.presetId]: layout.slice() } };
 }
 
 /**
- * "Reset to preset" in edit mode: Custom goes back to blank (D24); a built-in preset has nothing to
- * reset (it's always its own default), so this only ever changes state when Custom is active.
+ * "Reset to default" in edit mode: Custom goes back to blank (D24); a built-in preset drops its
+ * saved override, if any, back to its shipped default (D32).
  */
 export function resetActivePreset(state) {
-  return state.presetId === 'custom' ? { ...state, custom: null } : state;
+  if (state.presetId === 'custom') return { ...state, custom: null };
+  if (!(state.presetId in (state.overrides || {}))) return state;
+  const overrides = { ...state.overrides };
+  delete overrides[state.presetId];
+  return { ...state, overrides };
 }
