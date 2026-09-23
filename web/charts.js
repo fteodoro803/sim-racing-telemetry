@@ -1,6 +1,7 @@
-// Minimal hand-drawn canvas line charts for the speed and delta traces.
+// Minimal hand-drawn canvas line charts: the speed and delta traces (lap-distance x-axis), plus the
+// Pedal Trace (a rolling time window instead).
 //
-// No library: two charts don't justify a dependency.
+// No library: a handful of charts don't justify a dependency.
 
 /**
  * Read the chart colours from the page's CSS variables, so charts follow light/dark mode.
@@ -183,4 +184,108 @@ export function drawChart(canvas, series, opts) {
     ctx.fillStyle = opts.marker.color;
     ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
   }
+}
+
+/**
+ * Append `sample` (`{t, ...}`, `t` in ms) to a rolling buffer and trim anything older than `windowMs`
+ * before the newest sample - the Pedal Trace widget's rolling window of recent throttle/brake values,
+ * kept across redraws in the widget's own refs rather than in the lap tracker (it isn't lap-relative).
+ *
+ * Clears the buffer first if `sample.t` is more than a second behind the last one, rather than
+ * bridging the gap: the game clock went backwards, meaning a new session started (frame.t is
+ * monotonic per session - see the README's frame format), not that time is standing still.
+ *
+ * Mutates and returns `samples`.
+ */
+export function pushTraceSample(samples, sample, windowMs) {
+  const last = samples[samples.length - 1];
+  if (last && sample.t < last.t - 1000) samples.length = 0;
+  samples.push(sample);
+  const cutoff = sample.t - windowMs;
+  while (samples.length > 1 && samples[0].t < cutoff) samples.shift();
+  return samples;
+}
+
+/**
+ * Draw the Pedal Trace widget onto `canvas`: throttle and brake, both 0-100, over the last `windowMs`
+ * of `samples` (`{t, thr, brk}`, oldest first), newest sample pinned to the right edge ("now").
+ *
+ * Unlike `drawChart`, both series share one axis with no signed/zero split, and where their filled
+ * areas overlap is what the widget exists to show - drawn with `globalCompositeOperation: 'screen'`
+ * so the two translucent fills blend to a lighter colour on their own, with no separate overlap
+ * polygon to compute. `variant` picks how much chart chrome is drawn (D27, like any other widget
+ * shape): 'compact' drops the fill and all padding/labels down to bare lines; 'gridlines' adds a
+ * faint vertical line every second so an overlap's width can be read against a known interval.
+ */
+export function drawPedalTrace(canvas, samples, { windowMs, theme, variant = 'filled' }) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!samples.length) return;
+
+  const compact = variant === 'compact';
+  const fill = variant === 'filled' || variant === 'gridlines';
+  const now = samples[samples.length - 1].t;
+  const start = now - windowMs;
+
+  const fontPx = Math.max(9, Math.min(h * 0.12, w * 0.035, 13));
+  const pad = compact ? { l: 2, r: 2, t: 2, b: 2 } : { l: fontPx * 2.4, r: 6, t: 6, b: fontPx * 1.6 };
+  const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const sx = (t) => pad.l + ((t - start) / windowMs) * pw;
+  const sy = (v) => pad.t + (1 - v / 100) * ph;
+
+  ctx.font = `${fontPx}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+  if (!compact) {
+    ctx.fillStyle = theme.text;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (const v of [0, 50, 100]) ctx.fillText(String(v), pad.l - 6, sy(v));
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`−${Math.round(windowMs / 1000)}s`, pad.l, h - pad.b + 4);
+    ctx.textAlign = 'right';
+    ctx.fillText('now', w - pad.r, h - pad.b + 4);
+  }
+
+  if (variant === 'gridlines') {
+    ctx.strokeStyle = theme.grid; ctx.lineWidth = 1;
+    for (let t = Math.ceil(start / 1000) * 1000; t <= now; t += 1000) {
+      const x = Math.round(sx(t)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ph); ctx.stroke();
+    }
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
+  const drawSeries = (key, color) => {
+    if (fill) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(sx(samples[0].t), sy(0));
+      for (const s of samples) ctx.lineTo(sx(s.t), sy(s[key]));
+      ctx.lineTo(sx(samples[samples.length - 1].t), sy(0));
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = compact ? 1.5 : 2;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    samples.forEach((s, i) => {
+      const x = sx(s.t), y = sy(s[key]);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  };
+  drawSeries('thr', theme.current);
+  drawSeries('brk', theme.bad);
+  ctx.restore();
 }

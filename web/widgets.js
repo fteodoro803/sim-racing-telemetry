@@ -7,7 +7,7 @@
 // (null before any arrives), the theme colours, and a few page flags. Widgets never talk to each
 // other or to the data source, which is what will let them be added, removed and moved later.
 
-import { drawChart } from './charts.js';
+import { drawChart, drawPedalTrace, pushTraceSample } from './charts.js';
 import { deltaClass, el, setClass, setText, svgEl } from './dom.js';
 import { fmtDelta, fmtLap, fmtSector } from './format.js';
 import { tyreZone } from './tyre-color.js';
@@ -855,7 +855,48 @@ const tyres = {
   },
 };
 
+/**
+ * Rolling last few seconds of throttle (blue) and brake (red) percentage, so the driver can see
+ * overlap between them (trail-braking, or a mistake) that a whole-lap chart would blur into
+ * illegibility (design/Widget Responsive Behavior.dc.html, "Pedal Trace"; D31 in DECISIONS.md).
+ *
+ * Unlike the lap-distance charts above, this one is real-time rather than lap-relative: its sample
+ * buffer lives in the widget's own refs (`r.samples`, via `pushTraceSample`), fed from `frame.t`
+ * every render call regardless of lap boundaries, and is never reset by a new lap or a reference-lap
+ * change. The widget reads its own variant and trace-window settings off its card's dataset (the
+ * same place `renderGrid` puts `data-variant`/`data-window` from the layout item), the way
+ * `deltaChart` reads `.has-chart` off its own card - `update` has no other way to know which shape or
+ * window this particular widget instance was configured with.
+ */
+const pedalTrace = {
+  title: 'Pedal Trace',
+  build(body) {
+    const card = body.closest('.widget');
+    card.classList.add('has-chart');
+    const legend = el('div', 'chart-legend pedaltrace-legend');
+    legend.append(
+      el('span', 'legend-item thr', 'THR'),
+      el('span', 'legend-item brk', 'BRK'),
+      el('span', 'legend-item both', 'BOTH'),
+    );
+    const canvas = el('canvas');
+    body.append(legend, canvas);
+    return { canvas, card, samples: [] };
+  },
+  update(r, { frame, theme }) {
+    const windowMs = (Number(r.card.dataset.window) || 5) * 1000;
+    if (frame && frame.t != null) {
+      pushTraceSample(r.samples, {
+        t: frame.t,
+        thr: Math.max(0, Math.min(100, frame.throttle ?? 0)),
+        brk: Math.max(0, Math.min(100, frame.brake ?? 0)),
+      }, windowMs);
+    }
+    drawPedalTrace(r.canvas, r.samples, { windowMs, theme, variant: r.card.dataset.variant || 'filled' });
+  },
+};
+
 export const WIDGETS = {
   currentLap, delta, sectors, deltaChart, speedChart, lastLap, bestLap, predicted, lapTable,
-  rpmGear, speed, pedals, tyres,
+  rpmGear, speed, pedals, tyres, pedalTrace,
 };

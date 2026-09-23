@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GRID, WIDGET_META, PRESET_LAYOUTS, itemsOverlap, withinGrid, hasCollision, isValidPlacement,
-  firstFreeSpot, resizeFromCorner, defaultVariant,
+  firstFreeSpot, resizeFromCorner, defaultVariant, defaultWindow,
 } from '../web/layout.js';
 
 test('itemsOverlap detects overlap and touching-but-not-overlapping cells', () => {
@@ -104,4 +104,10 @@ test('defaultVariant is a widget\'s first registered variant, or undefined if it
   assert.equal(defaultVariant('speed'), 'inline');
   assert.equal(defaultVariant('speedChart'), undefined);
   assert.equal(defaultVariant('not-a-widget'), undefined);
+});
+
+test('defaultWindow is a widget\'s first registered trace window, or undefined if it has none', () => {
+  assert.equal(defaultWindow('pedalTrace'), 3);
+  assert.equal(defaultWindow('speed'), undefined);
+  assert.equal(defaultWindow('not-a-widget'), undefined);
 });

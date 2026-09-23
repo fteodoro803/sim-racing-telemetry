@@ -176,6 +176,7 @@ function renderGrid(layout, editing) {
     const card = el('section', `widget w-${item.widget}`);
     card.dataset.widget = item.widget;
     card.dataset.variant = item.variant || WIDGET_META[item.widget]?.variants?.[0]?.id || '';
+    card.dataset.window = String(item.window ?? WIDGET_META[item.widget]?.windows?.[0] ?? '');
     card.style.gridColumn = `${item.col} / span ${item.w}`;
     card.style.gridRow = `${item.row} / span ${item.h}`;
     if (def.noLabel) card.classList.add('inline');
@@ -189,7 +190,7 @@ function renderGrid(layout, editing) {
     }
     if (editing) {
       card.classList.add('editable');
-      const { chrome, drag, remove, size, select } = buildEditChrome(item.widget, WIDGET_META[item.widget]?.variants);
+      const { chrome, drag, remove, size, select, windowSelect } = buildEditChrome(item.widget, WIDGET_META[item.widget]?.variants, WIDGET_META[item.widget]?.windows);
       setText(size, `${item.w}×${item.h}`);
       card.append(chrome);
       drag.addEventListener('pointerdown', (event) => { event.preventDefault(); editor.startMove(card, item.widget, event.pointerId); });
@@ -202,6 +203,11 @@ function renderGrid(layout, editing) {
         select.value = card.dataset.variant;
         select.addEventListener('pointerdown', (event) => event.stopPropagation());
         select.addEventListener('change', () => editor.setVariant(item.widget, select.value));
+      }
+      if (windowSelect) {
+        windowSelect.value = card.dataset.window;
+        windowSelect.addEventListener('pointerdown', (event) => event.stopPropagation());
+        windowSelect.addEventListener('change', () => editor.setWindow(item.widget, windowSelect.value));
       }
     }
     grid.append(card);
@@ -227,10 +233,23 @@ let expandedPaletteWidget = null;   // id of the palette entry currently showing
 const PREVIEW_FRAME = { gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false, throttle: 70, brake: 0, clutch: 0, speed: 226 };
 
 /**
+ * A believable throttle-lift-into-brake trace for Pedal Trace's preview (a trail-braking shape, with
+ * a brief throttle/brake overlap partway through) - it needs several points over time rather than one
+ * static frame, unlike every other widget's `PREVIEW_FRAME`.
+ */
+const PEDAL_TRACE_PREVIEW = [
+  { throttle: 15, brake: 0 }, { throttle: 45, brake: 0 }, { throttle: 75, brake: 0 }, { throttle: 92, brake: 0 },
+  { throttle: 55, brake: 25 }, { throttle: 15, brake: 65 }, { throttle: 0, brake: 88 }, { throttle: 0, brake: 42 },
+  { throttle: 20, brake: 0 }, { throttle: 50, brake: 0 },
+];
+
+/**
  * A snapshot of the widget itself, at the given variant, for the palette's picker - built and drawn
  * with the widget's own `build`/`update` (same as `renderGrid`) so what you pick is exactly what you
  * get, not a hand-drawn stand-in. `.widget` is already a CSS size container (D25's fluid clamps), so
- * it draws correctly at this smaller fixed size; only `frame` is faked, from `PREVIEW_FRAME`.
+ * it draws correctly at this smaller fixed size; only `frame` is faked, from `PREVIEW_FRAME` - except
+ * Pedal Trace, whose rolling buffer needs `PEDAL_TRACE_PREVIEW`'s several points fed in over several
+ * calls rather than one.
  */
 function buildVariantPreview(widgetId, variantId) {
   const def = WIDGETS[widgetId];
@@ -240,7 +259,11 @@ function buildVariantPreview(widgetId, variantId) {
   const body = el('div', 'w-body');
   card.append(body);
   const refs = def.build(body);
-  def.update(refs, { frame: PREVIEW_FRAME, theme: app.theme, mode: 'demo' });
+  if (widgetId === 'pedalTrace') {
+    PEDAL_TRACE_PREVIEW.forEach((s, i) => def.update(refs, { frame: { t: i * 300, ...s }, theme: app.theme, mode: 'demo' }));
+  } else {
+    def.update(refs, { frame: PREVIEW_FRAME, theme: app.theme, mode: 'demo' });
+  }
   return card;
 }
 

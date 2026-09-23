@@ -312,6 +312,14 @@ button, select, input { font: inherit; color: inherit; }
 .legend-item.cur::before { background: var(--accent); }
 .legend-item.ref::before { background: var(--reference); }
 
+/* ---- pedal trace (design/Widget Responsive Behavior.dc.html, "Pedal Trace") ---- */
+.pedaltrace-legend { display: none; }
+.widget[data-variant="filled"] .pedaltrace-legend,
+.widget[data-variant="gridlines"] .pedaltrace-legend { display: flex; }
+.legend-item.thr::before { background: var(--accent); }
+.legend-item.brk::before { background: var(--bad); }
+.legend-item.both::before { background: var(--best); }
+
 /* ---- last lap (design/Widget Responsive Behavior.dc.html, "Last Lap — options") ---- */
 .lastlap-stacked, .lastlap-row, .lastlap-dual, .lastlap-trend { display: none; }
 .widget[data-variant="stacked"] .lastlap-stacked { display: block; }
@@ -730,6 +738,8 @@ td.best { color: var(--best); font-weight: 600; }
   pointer-events: auto;
   cursor: pointer;
 }
+/* A widget with both a shape and a window select (Pedal Trace, D31) stacks the second below the first. */
+.window-select { top: calc(34 * var(--u)); }
 .ghost {
   position: absolute;
   border: 2px dashed var(--accent);
@@ -837,7 +847,7 @@ td.best { color: var(--best); font-weight: 600; }
   .w-sectors { order: 5; }
   .w-lastLap, .w-bestLap { grid-column: span 1 !important; order: 6; }
   .w-predicted { order: 7; }
-  .w-deltaChart, .w-speedChart { order: 8; }
+  .w-deltaChart, .w-speedChart, .w-pedalTrace { order: 8; }
   .w-pedals { order: 9; }
   /* Explicit height (BUG-3), same idea as .w-lapTable below. A plain height alone isn't enough here:
    * .tyre's width is min(45cqh, 35cqw, 260px), and cqh comes from this box's own height, so raising
@@ -868,6 +878,6 @@ td.best { color: var(--best); font-weight: 600; }
     gap: calc(10 * var(--u));
   }
   .widget { grid-column: auto !important; grid-row: auto !important; }
-  .w-deltaChart, .w-speedChart, .w-lastLap, .w-bestLap, .w-predicted, .w-pedals, .w-tyres, .w-lapTable { display: none; }
+  .w-deltaChart, .w-speedChart, .w-pedalTrace, .w-lastLap, .w-bestLap, .w-predicted, .w-pedals, .w-tyres, .w-lapTable { display: none; }
   .presets, #editBtn, .badge, .status { display: none; }
 }
