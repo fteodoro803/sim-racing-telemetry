@@ -44,41 +44,43 @@
       <button class="btn" id="editBtn" type="button">Edit</button>
     </div>
     <div class="topbar-right" id="editRight" hidden>
-      <button class="btn" id="paletteBtn" type="button">Add widget</button>
       <button class="btn" id="resetPresetBtn" type="button">Reset to preset</button>
       <button class="btn" id="saveCustomBtn" type="button">Save as Custom</button>
       <button class="btn primary" id="doneBtn" type="button">Done</button>
     </div>
   </header>
 
-  <!-- ===== Widget grid (filled in by app.js from layout.js / dashboard-state.js) ===== -->
-  <main class="grid" id="grid"></main>
+  <!-- ===== Workspace: widget grid alongside the add-widget palette, so opening it resizes ===== -->
+  <!-- ===== the grid instead of covering it (see DASHBOARD_PLAN.md) ===== -->
+  <div class="workspace">
+    <!-- ===== Widget grid (filled in by app.js from layout.js / dashboard-state.js) ===== -->
+    <main class="grid" id="grid"></main>
 
-  <!-- ===== Palette drawer: add a widget while editing ===== -->
-  <aside class="palette" id="palette" hidden>
-    <div class="palette-title">Add widget</div>
-    <div class="palette-group-title">Timing</div>
-    <div class="palette-list" id="paletteTiming"></div>
-    <div class="palette-group-title">Driving</div>
-    <div class="palette-list" id="paletteDriving"></div>
-    <div class="palette-group-title">Coming later</div>
-    <div class="palette-list">
-      <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Fuel</span><span class="soon">SOON</span></div>
-      <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Track Map</span><span class="soon">SOON</span></div>
+    <!-- ===== Palette drawer: add a widget while editing ===== -->
+    <aside class="palette" id="palette" hidden>
+      <div class="palette-title">Add widget</div>
+      <div class="palette-group-title">Timing</div>
+      <div class="palette-list" id="paletteTiming"></div>
+      <div class="palette-group-title">Driving</div>
+      <div class="palette-list" id="paletteDriving"></div>
+      <div class="palette-group-title">Coming later</div>
+      <div class="palette-list">
+        <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Fuel</span><span class="soon">SOON</span></div>
+        <div class="palette-item later"><span class="palette-swatch"></span><span class="palette-name">Track Map</span><span class="soon">SOON</span></div>
+      </div>
+    </aside>
+
+    <!-- ===== Custom, before anything has been added to it ===== -->
+    <div class="empty-state" id="emptyState" hidden>
+      <div class="empty-title">No widgets yet</div>
+      <div class="empty-text">Add widgets from the palette on the right and arrange them on the grid.</div>
     </div>
-  </aside>
 
-  <!-- ===== Custom, before anything has been added to it ===== -->
-  <div class="empty-state" id="emptyState" hidden>
-    <div class="empty-title">No widgets yet</div>
-    <div class="empty-text">Add widgets from the palette and arrange them on the grid.</div>
-    <button class="btn primary" id="emptyAddBtn" type="button">Add widgets</button>
-  </div>
-
-  <!-- ===== Message shown over the grid until the first live frame arrives ===== -->
-  <div class="overlay" id="overlay" hidden>
-    <div class="overlay-title" id="overlayTitle"></div>
-    <div class="overlay-text" id="overlayText"></div>
+    <!-- ===== Message shown over the grid until the first live frame arrives ===== -->
+    <div class="overlay" id="overlay" hidden>
+      <div class="overlay-title" id="overlayTitle"></div>
+      <div class="overlay-text" id="overlayText"></div>
+    </div>
   </div>
 </div>
 
