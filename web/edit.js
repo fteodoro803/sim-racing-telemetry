@@ -96,6 +96,8 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     function onUp() {
       card.removeEventListener('pointermove', onMove);
       card.removeEventListener('pointerup', onUp);
+      card.removeEventListener('pointercancel', onUp);
+      card.removeEventListener('lostpointercapture', onUp);
       card.releasePointerCapture(pointerId);
       card.classList.remove('is-dragging');
       endInteraction();
@@ -109,6 +111,10 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     card.setPointerCapture(pointerId);
     card.addEventListener('pointermove', onMove);
     card.addEventListener('pointerup', onUp);
+    card.addEventListener('pointercancel', onUp);
+    // Safety net: if capture ends without a pointerup ever reaching us (button released outside the
+    // window, the OS eating the event mid-drag), this still fires and clears the stuck ghost/highlight.
+    card.addEventListener('lostpointercapture', onUp);
   }
 
   function startResize(card, widgetId, corner, pointerId) {
@@ -133,6 +139,8 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     function onUp() {
       card.removeEventListener('pointermove', onMove);
       card.removeEventListener('pointerup', onUp);
+      card.removeEventListener('pointercancel', onUp);
+      card.removeEventListener('lostpointercapture', onUp);
       card.releasePointerCapture(pointerId);
       endInteraction();
       if (pending) {
@@ -144,6 +152,10 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     card.setPointerCapture(pointerId);
     card.addEventListener('pointermove', onMove);
     card.addEventListener('pointerup', onUp);
+    card.addEventListener('pointercancel', onUp);
+    // Safety net: if capture ends without a pointerup ever reaching us (button released outside the
+    // window, the OS eating the event mid-drag), this still fires and clears the stuck ghost/highlight.
+    card.addEventListener('lostpointercapture', onUp);
   }
 
   function removeWidget(widgetId) {
