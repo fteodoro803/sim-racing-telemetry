@@ -160,16 +160,20 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     onChange(next);
   }
 
-  /** Add `widgetId` at its registry default size and variant, at the first free spot; a no-op if nothing fits. */
-  function addWidget(widgetId) {
+  /**
+   * Add `widgetId` at its registry default size, at the first free spot; a no-op if nothing fits.
+   * `variant` picks the shape to place it with (from the palette's variant picker); defaults to the
+   * registry's first variant when the caller doesn't have one chosen yet.
+   */
+  function addWidget(widgetId, variant) {
     const meta = WIDGET_META[widgetId];
     if (!meta) return;
     const layout = getLayout();
     if (layout.some((it) => it.widget === widgetId)) return;   // already on the grid
     const spot = firstFreeSpot(layout, meta.addW, meta.addH);
     if (!spot) return;
-    const variant = defaultVariant(widgetId);
-    onChange([...layout, { widget: widgetId, ...spot, ...(variant ? { variant } : {}) }]);
+    const chosen = variant || defaultVariant(widgetId);
+    onChange([...layout, { widget: widgetId, ...spot, ...(chosen ? { variant: chosen } : {}) }]);
   }
 
   return { startMove, startResize, removeWidget, addWidget, setVariant };
