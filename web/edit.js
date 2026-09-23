@@ -5,7 +5,7 @@
 // Operates on a "draft" layout array owned by the caller (app.js): this module never decides when
 // to persist it, only calls `onChange(nextLayout)` whenever a move, resize, add or remove commits.
 
-import { GRID, WIDGET_META, hasCollision, withinGrid, resizeFromCorner, firstFreeSpot, defaultVariant } from './layout.js';
+import { GRID, WIDGET_META, hasCollision, withinGrid, resizeFromCorner, firstFreeSpot, defaultVariant, defaultWindow } from './layout.js';
 import { el } from './dom.js';
 
 /** Pixel size of one grid cell, read from the grid element's own current geometry. */
@@ -160,10 +160,22 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     onChange(next);
   }
 
+  /** Change a widget's trace window (D31, e.g. Pedal Trace's seconds of history); same mechanism as setVariant. */
+  function setWindow(widgetId, windowSeconds) {
+    const layout = getLayout();
+    const index = layout.findIndex((it) => it.widget === widgetId);
+    if (index === -1) return;
+    const next = layout.slice();
+    next[index] = { ...next[index], window: Number(windowSeconds) };
+    onChange(next);
+  }
+
   /**
    * Add `widgetId` at its registry default size, at the first free spot; a no-op if nothing fits.
    * `variant` picks the shape to place it with (from the palette's variant picker); defaults to the
-   * registry's first variant when the caller doesn't have one chosen yet.
+   * registry's first variant when the caller doesn't have one chosen yet. Its `window` (D31), if the
+   * registry lists any, always starts at the registry's default - the palette doesn't offer a pick
+   * for it the way it does for a shape variant.
    */
   function addWidget(widgetId, variant) {
     const meta = WIDGET_META[widgetId];
@@ -173,18 +185,21 @@ export function wireEditMode(gridEl, { getLayout, onChange, onTintCollisions, gh
     const spot = firstFreeSpot(layout, meta.addW, meta.addH);
     if (!spot) return;
     const chosen = variant || defaultVariant(widgetId);
-    onChange([...layout, { widget: widgetId, ...spot, ...(chosen ? { variant: chosen } : {}) }]);
+    const window = defaultWindow(widgetId);
+    onChange([...layout, { widget: widgetId, ...spot, ...(chosen ? { variant: chosen } : {}), ...(window ? { window } : {}) }]);
   }
 
-  return { startMove, startResize, removeWidget, addWidget, setVariant };
+  return { startMove, startResize, removeWidget, addWidget, setVariant, setWindow };
 }
 
 /**
  * The drag handle, remove button, four resize handles and size tag added to a card while editing.
  * `variants` (from the widget's registry entry, if it has more than one shape) also adds a select
- * for choosing between them - D27, so a widget's shape is chosen explicitly, not picked from its size.
+ * for choosing between them - D27, so a widget's shape is chosen explicitly, not picked from its
+ * size. `windows` (a widget's numeric setting, e.g. Pedal Trace's seconds of history - D31) adds a
+ * second select the same way, stacked below the first.
  */
-export function buildEditChrome(widgetId, variants) {
+export function buildEditChrome(widgetId, variants, windows) {
   const chrome = el('div', 'edit-chrome');
   const drag = el('button', 'drag-handle');
   drag.type = 'button';
@@ -210,5 +225,18 @@ export function buildEditChrome(widgetId, variants) {
     }
     chrome.append(select);
   }
-  return { chrome, drag, remove, size, select };
+  let windowSelect = null;
+  if (windows && windows.length > 1) {
+    windowSelect = document.createElement('select');
+    windowSelect.className = 'variant-select window-select';
+    windowSelect.setAttribute('aria-label', 'Trace window');
+    for (const seconds of windows) {
+      const option = document.createElement('option');
+      option.value = String(seconds);
+      option.textContent = `${seconds}s`;
+      windowSelect.append(option);
+    }
+    chrome.append(windowSelect);
+  }
+  return { chrome, drag, remove, size, select, windowSelect };
 }

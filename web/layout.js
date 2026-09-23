@@ -2,11 +2,13 @@
 //
 // From the wireframes: a 12 column by 8 row grid, designed at 1180x820 (iPad landscape) with a
 // 48px top bar, 16px margin and 12px gutters. The page scales this to any screen. A layout is an
-// array of { widget, col, row, w, h, variant? }, each placing one widget by its top-left cell and
-// its size in whole cells (1-based). `variant` only applies to widgets whose registry entry lists
-// `variants` (D27 in DECISIONS.md): which shape the widget is drawn in, chosen explicitly in edit
-// mode rather than picked automatically from the widget's size - content still scales fluidly with
-// the box either way (D25), but the shape itself only changes when the user asks it to.
+// array of { widget, col, row, w, h, variant?, window? }, each placing one widget by its top-left
+// cell and its size in whole cells (1-based). `variant` only applies to widgets whose registry entry
+// lists `variants` (D27 in DECISIONS.md): which shape the widget is drawn in, chosen explicitly in
+// edit mode rather than picked automatically from the widget's size - content still scales fluidly
+// with the box either way (D25), but the shape itself only changes when the user asks it to. `window`
+// is the same idea for a widget whose registry entry lists `windows` (D31): a numeric setting (seconds
+// of trace history, for Pedal Trace) rather than a shape, but chosen and stored the same way.
 //
 // No DOM here: the geometry helpers below are pure, so edit mode's drag/resize/collision logic can
 // be tested without a browser (see tests/layout.test.mjs).
@@ -106,11 +108,28 @@ export const WIDGET_META = {
     ],
   },
   tyres: { title: 'Tyres', group: 'driving', minW: 2, minH: 2, addW: 2, addH: 2 },
+  pedalTrace: {
+    title: 'Pedal Trace', group: 'driving', minW: 2, minH: 1, addW: 6, addH: 2,
+    variants: [
+      { id: 'filled', title: 'Filled Areas' },
+      { id: 'lines', title: 'Lines' },
+      { id: 'compact', title: 'Compact' },
+      { id: 'gridlines', title: 'Second Gridlines' },
+    ],
+    // Seconds of trace history shown, oldest falling off the left edge (D31). A short list of
+    // presets, picked the same way a shape variant is, rather than a free-form slider.
+    windows: [3, 4, 5, 6, 7, 8, 9, 10],
+  },
 };
 
 /** A widget's variant unless the layout item names one - the first entry in its registry list. */
 export function defaultVariant(widgetId) {
   return WIDGET_META[widgetId]?.variants?.[0]?.id;
+}
+
+/** A widget's trace window (seconds) unless the layout item names one - the first of its registry list. */
+export function defaultWindow(widgetId) {
+  return WIDGET_META[widgetId]?.windows?.[0];
 }
 
 export const PRESET_IDS = ['everything', 'timing', 'driving', 'custom'];
