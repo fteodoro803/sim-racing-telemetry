@@ -227,10 +227,12 @@ function paletteEntries(group) {
   return Object.entries(WIDGET_META).filter(([, meta]) => meta.group === group);
 }
 
-let expandedPaletteWidget = null;   // id of the palette entry currently showing its variant picker, if any
-
 /** Plausible values for a variant preview - not live data, just enough for the widget to draw something believable. */
-const PREVIEW_FRAME = { gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false, throttle: 70, brake: 0, clutch: 0, speed: 226 };
+const PREVIEW_FRAME = {
+  gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false,
+  throttle: 70, brake: 0, clutch: 0, speed: 226,
+  tyreTemp: [84, 83, 78, 77],   // FL, FR, RL, RR - mid-optimal, front slightly hotter (as demo-source.js models)
+};
 
 /**
  * A believable throttle-lift-into-brake trace for Pedal Trace's preview (a trail-braking shape, with
@@ -243,13 +245,60 @@ const PEDAL_TRACE_PREVIEW = [
   { throttle: 20, brake: 0 }, { throttle: 50, brake: 0 },
 ];
 
+let previewFixture = null;          // { tracker, frame } snapshot the palette's previews render from, once loaded
+let previewFixtureLoading = null;   // in-flight load, so concurrent triggers (several widgets expanding) share it
+
+const PREVIEW_LAP_ADVANCE_MS = 25000;   // ~42% into the live lap - enough samples for a chart, short of finishing it
+
 /**
- * A snapshot of the widget itself, at the given variant, for the palette's picker - built and drawn
- * with the widget's own `build`/`update` (same as `renderGrid`) so what you pick is exactly what you
- * get, not a hand-drawn stand-in. `.widget` is already a CSS size container (D25's fluid clamps), so
- * it draws correctly at this smaller fixed size; only `frame` is faked, from `PREVIEW_FRAME` - except
- * Pedal Trace, whose rolling buffer needs `PEDAL_TRACE_PREVIEW`'s several points fed in over several
- * calls rather than one.
+ * A fixed, idle-state snapshot for the palette's variant previews: the demo data's opening laps
+ * (already labelled synthetic, same as a real demo start - `DEMO_HISTORY_LAPS`) run through a
+ * throwaway `LapTracker`, so a widget's real `update()` sees a real tracker with real
+ * lastLap/bestLap/sectors/delta history instead of a hand-faked stand-in whose API would have to be
+ * kept in sync with timing.js by hand (BUG-4 in BUGS.md). Deliberately its own tracker, never the
+ * session's live one, so the preview stays the same regardless of what's actually running or how far
+ * into it the user has scrubbed. Built once, lazily, the first time a palette picker needs it.
+ *
+ * `feedUntilLap` alone stops at the live lap's very first sample, which leaves `deltaSeries()`/
+ * `speedSeries()` (Delta Chart, Speed Chart) with nothing to plot - they read off the in-progress
+ * lap's own accumulated samples, not the completed laps `feedUntilLap` already guarantees. Advancing
+ * a further `PREVIEW_LAP_ADVANCE_MS` into that lap gives every widget real data, not just the ones
+ * that only need a completed lap.
+ */
+async function loadPreviewFixture() {
+  if (previewFixture) return previewFixture;
+  if (!previewFixtureLoading) {
+    previewFixtureLoading = (async () => {
+      const source = new DemoSource(await loadDemoData());
+      const tracker = new LapTracker();
+      let frame = null;
+      const emit = (f) => { tracker.ingest(f); frame = f; };
+      source.feedUntilLap(DEMO_HISTORY_LAPS, emit);
+      source.advance(PREVIEW_LAP_ADVANCE_MS, 1, emit);
+      previewFixture = { tracker, frame };
+      return previewFixture;
+    })();
+  }
+  return previewFixtureLoading;
+}
+
+/**
+ * A snapshot of the widget itself, at the given variant, for the picker modal - built and drawn with
+ * the widget's own `build`/`update` (same as `renderGrid`) so what you pick is exactly what you get,
+ * not a hand-drawn stand-in. `.widget` sizes itself from `--variant-ratio` (set by the caller) rather
+ * than a fixed box, so it renders close to the widget's real grid-cell proportions instead of squashed
+ * into an arbitrary strip. Only `frame` is faked, from `PREVIEW_FRAME` - except Pedal Trace, whose
+ * rolling buffer needs `PEDAL_TRACE_PREVIEW`'s several points fed in over several calls rather than
+ * one - everything else comes from `loadPreviewFixture()`'s idle snapshot. While that's still loading
+ * (first use only - it's cached after), this renders a placeholder and re-renders the open modal once
+ * it resolves.
+ *
+ * Builds the DOM only - doesn't call `update()` yet. A canvas-drawing widget (Delta Chart, Speed
+ * Chart, Pedal Trace) reads its own `canvas.clientWidth`/`clientHeight` during `update()`, which are
+ * both 0 before the card is actually attached to the document; `renderWidgetPickerModal` builds every
+ * option's DOM, attaches the whole modal, and only then calls `updatePreview` on each one, the same
+ * order `renderGrid`/the main render loop already use for the real grid (build while detached, update
+ * only once on-screen).
  */
 function buildVariantPreview(widgetId, variantId) {
   const def = WIDGETS[widgetId];
@@ -258,20 +307,108 @@ function buildVariantPreview(widgetId, variantId) {
   if (!def.noLabel) card.append(el('div', 'w-label', def.title));
   const body = el('div', 'w-body');
   card.append(body);
-  const refs = def.build(body);
-  if (widgetId === 'pedalTrace') {
-    PEDAL_TRACE_PREVIEW.forEach((s, i) => def.update(refs, { frame: { t: i * 300, ...s }, theme: app.theme, mode: 'demo' }));
-  } else {
-    def.update(refs, { frame: PREVIEW_FRAME, theme: app.theme, mode: 'demo' });
+  if (!previewFixture) {
+    body.append(el('div', 'vi-preview-loading', 'Loading preview…'));
+    loadPreviewFixture().then(() => { if (openPickerWidgetId) renderWidgetPickerModal(); });
+    return { card };
   }
-  return card;
+  const refs = def.build(body);
+  return { card, def, refs, widgetId };
+}
+
+/** Runs a preview's first `update()`, once its card is actually attached to the document (see above). */
+function updatePreview({ def, refs, widgetId }) {
+  const previewCtx = { tracker: previewFixture.tracker, live: previewFixture.tracker.live, theme: app.theme, mode: 'demo' };
+  if (widgetId === 'pedalTrace') {
+    PEDAL_TRACE_PREVIEW.forEach((s, i) => def.update(refs, { ...previewCtx, frame: { t: i * 300, ...s } }));
+  } else {
+    def.update(refs, { ...previewCtx, frame: PREVIEW_FRAME });
+  }
+}
+
+let openPickerWidgetId = null;   // id of the widget whose "choose a design" modal is open, if any
+let pickerModalEl = null;        // that modal's DOM node, so it can be torn down again
+
+function onPickerKeydown(event) {
+  if (event.key === 'Escape') closeWidgetPicker();
+}
+
+function closeWidgetPicker() {
+  openPickerWidgetId = null;
+  pickerModalEl?.remove();
+  pickerModalEl = null;
+  document.removeEventListener('keydown', onPickerKeydown);
+}
+
+/**
+ * The "choose a design" modal: every design a widget offers, shown at once as full-size previews, so
+ * picking one doesn't mean clicking through them first. A widget without `variants` still opens it,
+ * with its one design as the only option - clicking a palette entry always previews before it lands on
+ * the grid, whether or not there's a choice to make (D27's intent, now applied uniformly). Rebuilt
+ * from scratch on every call (including the preview-fixture's load callback above) rather than patched
+ * in place, same as the rest of this file's render functions.
+ */
+function renderWidgetPickerModal() {
+  pickerModalEl?.remove();
+  pickerModalEl = null;
+  if (!openPickerWidgetId) return;
+  const id = openPickerWidgetId;
+  const meta = WIDGET_META[id];
+  const options = meta.variants && meta.variants.length > 1 ? meta.variants : [{ id: '', title: null }];
+
+  const modal = el('div', 'modal');
+  const card = el('div', 'modal-card wide');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+
+  const head = el('div', 'modal-head');
+  head.append(el('h2', '', meta.title));
+  const closeBtn = el('button', 'btn', '✕');
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.addEventListener('click', closeWidgetPicker);
+  head.append(closeBtn);
+
+  // A widget noticeably wider than tall (Sectors, Delta Chart, Lap Table, Pedal Trace) gets two grid
+  // columns' width instead of being squeezed to the same column as a roughly-square one (RPM + Gear,
+  // Best Lap, ...), which otherwise shrinks its content past legible.
+  const wide = meta.addW / meta.addH >= 1.8;
+
+  const grid = el('div', 'variant-modal-grid');
+  const previews = [];   // {def, refs, widgetId} for each option that built successfully - updated below, once attached
+  for (const v of options) {
+    const option = el('button', `variant-modal-option${wide ? ' wide' : ''}`);
+    option.type = 'button';
+    option.style.setProperty('--variant-ratio', `${meta.addW} / ${meta.addH}`);
+    const preview = buildVariantPreview(id, v.id);
+    option.append(preview.card);
+    if (preview.def) previews.push(preview);
+    if (v.title) option.append(el('span', 'variant-modal-label', v.title));
+    option.addEventListener('click', () => {
+      closeWidgetPicker();
+      editor.addWidget(id, v.id || undefined);
+    });
+    grid.append(option);
+  }
+
+  card.append(head, grid);
+  modal.append(card);
+  modal.addEventListener('click', (event) => { if (event.target === modal) closeWidgetPicker(); });
+  document.body.append(modal);
+  pickerModalEl = modal;
+  for (const preview of previews) updatePreview(preview);
+  document.addEventListener('keydown', onPickerKeydown);
+}
+
+function openWidgetPicker(widgetId) {
+  openPickerWidgetId = widgetId;
+  renderWidgetPickerModal();
 }
 
 function buildPaletteList(containerId, group) {
   const list = $(containerId);
   list.replaceChildren();
   for (const [id, meta] of paletteEntries(group)) {
-    const hasVariants = meta.variants && meta.variants.length > 1;
     const item = el('button', 'palette-item');
     item.type = 'button';
     const swatch = el('span', 'palette-swatch');
@@ -281,33 +418,9 @@ function buildPaletteList(containerId, group) {
     const already = app.draftLayout.some((it) => it.widget === id);
     item.disabled = already;
     item.classList.toggle('added', already);
-    const expanded = hasVariants && expandedPaletteWidget === id;
-    item.classList.toggle('expanded', expanded);
-    if (hasVariants) {
-      // Pick the shape before it lands on the grid (D27's picker, moved ahead of placement): a first
-      // click opens the variant row below instead of adding the widget outright.
-      item.addEventListener('click', () => {
-        expandedPaletteWidget = expanded ? null : id;
-        renderPalette();
-      });
-    } else {
-      item.addEventListener('click', () => editor.addWidget(id));
-    }
+    // Preview before placing (D27): every entry opens the picker modal, even with just one design.
+    item.addEventListener('click', () => openWidgetPicker(id));
     list.append(item);
-    if (expanded) {
-      const variants = el('div', 'palette-variants');
-      for (const v of meta.variants) {
-        const button = el('button', 'palette-variant-btn');
-        button.type = 'button';
-        button.append(buildVariantPreview(id, v.id), el('span', 'palette-variant-label', v.title));
-        button.addEventListener('click', () => {
-          expandedPaletteWidget = null;
-          editor.addWidget(id, v.id);
-        });
-        variants.append(button);
-      }
-      list.append(variants);
-    }
   }
 }
 
@@ -345,7 +458,7 @@ function selectPreset(presetId) {
 function enterEditMode() {
   app.draftLayout = cloneOfPreset(app.dashboard.presetId);
   app.editing = true;
-  expandedPaletteWidget = null;
+  closeWidgetPicker();
   renderGrid(app.draftLayout, true);
   renderPalette();
   $('palette').hidden = false;
@@ -360,6 +473,7 @@ function doneEditing() {
   }
   app.editing = false;
   app.draftLayout = null;
+  closeWidgetPicker();
   $('palette').hidden = true;
   renderGrid(currentLayout(app.dashboard), false);
   renderChrome();

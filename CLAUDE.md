@@ -55,5 +55,6 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 **Definition of done:**
 - `npm test` passes (Node 20+, no dependencies), and `npm run test:bridge` passes for any bridge change.
 - For UI changes: `npm run serve`, load http://localhost:8000, check the browser console is clean, and check a phone-width viewport for horizontal overflow.
+- For a new or changed widget: open its entry in the "Add widget" picker modal and check every option it shows - real, non-blank data (not a dash or an empty chart; see `loadPreviewFixture` in `web/app.js`), and laid out correctly at the size the modal renders it at.
 - Logic changes come with a test; a bug fix comes with a regression test (see `BUGS.md`).
 - Affected docs are updated in the same change.
