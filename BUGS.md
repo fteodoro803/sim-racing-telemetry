@@ -29,9 +29,26 @@ Resolved entries additionally carry `**Fix:**` (commit/PR) and `**Regression tes
 
 ## Open
 
+### BUG-5 — Dense picker-modal previews overlap at phone width
+**Status:** Open
+**Found:** 2026-09-23, while checking the new widget-picker modal at 375×812 per this repo's "Definition of done"
+**Symptom:** In the palette's "choose a design" modal (see `openWidgetPicker`/`renderWidgetPickerModal` in `web/app.js`), Lap Table's `spreadsheet` variant renders with its numeric columns overlapping and illegible at phone width; `table` gets a (probably intended) horizontal scrollbar instead.
+**Repro:** At ≤375px width, open edit mode → Custom → click "Lap Table" in the palette → scroll to the Spreadsheet preview.
+**Root cause:** not chased down in detail, but very likely just the modal's own sizing: `.modal-card.wide` cans at `92vw`, and a `wide`-flagged option (`addW`/`addH` ratio ≥ 1.8, like Lap Table's 6×3) still only gets one grid column on a screen too narrow for two, so its `aspect-ratio`-derived box ends up narrower than the widget's dense variants need to lay out cleanly. This is preview-only: the real Lap Table widget doesn't use this grid at phone width at all (`.w-lapTable` in the phone breakpoint stacks it near full device width with an explicit height, per `DASHBOARD_PLAN.md` log 11/17), so the cramped look never happens in actual use - only in this modal's preview box.
+**Suspected fix:** either let the modal grow closer to full viewport width on narrow screens for `wide` options specifically, or fall back to a fixed/minimum preview width (with horizontal scroll, like `table` already effectively gets) instead of deriving it purely from `aspect-ratio` once the viewport can't fit it.
+
 ---
 
 ## Resolved
+
+### BUG-4 — Expanding a Timing widget's variant picker in the palette silently broke the rest of the list
+**Status:** Resolved
+**Found:** 2026-09-23, from a user report: "some [widgets] aren't showing up as options [when selecting variants]. I can't see or select them."
+**Symptom:** In edit mode's Add Widget palette, clicking a Timing-group widget that has `variants` (Delta, Sectors, Delta Chart, Last Lap, Best Lap, Predicted, Lap Table) to open its shape picker threw an uncaught `TypeError` and left every widget after it in that palette section (and the clicked widget's own variant row) missing entirely, instead of showing the expected preview buttons. Driving-group widgets with variants (RPM + Gear, Speed, Pedals, Pedal Trace) were unaffected. The edit-chrome `<select>` on a widget already placed on the grid was never affected — only the palette's not-yet-placed picker.
+**Repro:** Edit mode → Custom (or any layout with room) → click "Delta" (or any other Timing widget with variants) in the palette to expand its shape picker. Before the fix, the variant row never appeared and every later Timing entry in the list vanished from the DOM; after the fix, all entries and their full variant lists render.
+**Root cause:** `buildVariantPreview()` in `web/app.js` built each preview by calling the widget's real `build`/`update` with a stripped-down fake context, `{ frame, theme, mode }` — no `tracker` or `live`. Every Driving widget's `update()` only reads `frame`/`theme`, so it happened to work; every Timing widget with variants destructures `tracker` (and several read `tracker.compareMode`, `tracker.sectorCount()`, etc. without optional-chaining `tracker` itself, since a real `tracker` always exists at runtime) and threw on the first preview build. The throw happened inside `buildPaletteList`'s per-widget `for` loop, so it aborted before appending that widget's variant row or any subsequent widget in the same palette group — not just the widget whose preview crashed.
+**Fix:** `buildVariantPreview()` now spreads the same `context()` used everywhere else (`{ ...context(), frame: PREVIEW_FRAME }`, or per-sample for Pedal Trace) instead of hand-building a partial one, so the real `tracker`/`live` are present and every widget's `update()` sees the shape it expects. [web/app.js](web/app.js)
+**Regression test:** none added — `web/app.js`/palette rendering is DOM-heavy UI wiring outside `tests/`'s scope (per this repo's convention, only `web/timing.js`, `web/demo-source.js` and `web/format.js` are covered there). Verified in a browser: expanded every Timing- and Driving-group widget with variants from an empty Custom layout and confirmed all variant buttons render and add the widget with the right `data-variant`, with a clean console throughout.
 
 ### BUG-3 — Tyres clips on the phone layout instead of getting a taller row
 **Status:** Resolved

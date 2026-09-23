@@ -620,7 +620,10 @@ td.best { color: var(--best); font-weight: 600; }
 .overlay-text { margin-top: calc(8 * var(--u)); font-size: calc(15 * var(--u)); color: var(--muted); }
 
 /* ---- setup modal ---- */
-.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; z-index: 10; }
+/* Above everything else fixed/positioned on the page, including the phone breakpoint's full-screen
+   palette overlay (z-index: 15 below) - a modal opened from inside that palette must still land on
+   top of it. */
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; z-index: 30; }
 .modal-card {
   width: min(calc(480 * var(--u)), 92vw);
   padding: calc(20 * var(--u));
@@ -784,34 +787,40 @@ td.best { color: var(--best); font-weight: 600; }
 .palette-swatch { width: calc(36 * var(--u)); height: calc(26 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--bg); border: 1px solid var(--line); flex: 0 0 auto; }
 .palette-name { flex: 1; font-size: calc(13 * var(--u)); }
 .palette-size { font-size: calc(11 * var(--u)); color: var(--dim); font-family: var(--mono); }
-.palette-variants {
-  display: flex;
-  flex-wrap: wrap;
-  gap: calc(8 * var(--u));
-  padding: 0 calc(8 * var(--u)) calc(8 * var(--u));
-  margin-top: calc(-2 * var(--u));
-}
-.palette-variant-btn {
+
+.soon { font-size: calc(9 * var(--u)); color: var(--dim); border: 1px solid var(--line); border-radius: 99px; padding: calc(2 * var(--u)) calc(7 * var(--u)); }
+
+/* ---- widget picker modal (reuses .modal/.modal-card/.modal-head from the setup modal above) ---- */
+.modal-card.wide { width: min(calc(720 * var(--u)), 92vw); max-height: 85vh; overflow-y: auto; }
+.variant-modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(200 * var(--u)), 1fr)); gap: calc(14 * var(--u)); justify-items: center; }
+/* A widget noticeably wider than tall (Sectors, Delta Chart, ...) spans two tracks and fills them, so
+   its content doesn't get squeezed to the same column width as a roughly-square widget. Everything
+   else gets a fixed, modest width instead of stretching to fill its grid track - with only one option
+   (a widget with no variants, e.g. Tyres) that track is the whole row, and stretching to fill it made
+   a small square widget balloon to the width of the entire modal. */
+.variant-modal-option.wide { grid-column: span 2; width: 100%; justify-self: stretch; }
+.variant-modal-option {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: calc(5 * var(--u));
-  width: calc(120 * var(--u));
-  font-size: calc(11 * var(--u));
-  color: var(--text);
+  gap: calc(8 * var(--u));
+  width: calc(220 * var(--u));
+  max-width: 100%;
+  color: inherit;
   background: rgba(255, 255, 255, .05);
   border: 1px solid var(--line);
-  border-radius: calc(6 * var(--u));
-  padding: calc(6 * var(--u));
+  border-radius: calc(8 * var(--u));
+  padding: calc(10 * var(--u));
   cursor: pointer;
   font: inherit;
+  text-align: center;
 }
-.palette-variant-btn:hover { background: rgba(255, 255, 255, .1); }
-.palette-variant-label { line-height: 1.2; }
+.variant-modal-option:hover { background: rgba(255, 255, 255, .1); border-color: var(--accent); }
+.variant-modal-label { font-size: calc(12 * var(--u)); }
 
-/* The variant preview reuses the real `.widget` styling (buildVariantPreview) at a smaller fixed size. */
-.vi-preview { width: 100%; height: calc(96 * var(--u)); flex: none; pointer-events: none; }
-.soon { font-size: calc(9 * var(--u)); color: var(--dim); border: 1px solid var(--line); border-radius: 99px; padding: calc(2 * var(--u)) calc(7 * var(--u)); }
+/* The variant preview reuses the real `.widget` styling (buildVariantPreview), sized by its parent
+   option toward the widget's real `addW`/`addH` proportions (--variant-ratio) rather than a fixed box. */
+.vi-preview { width: 100%; aspect-ratio: var(--variant-ratio, 1); flex: none; pointer-events: none; }
+.vi-preview-loading { display: flex; align-items: center; justify-content: center; height: 100%; font-size: calc(11 * var(--u)); color: var(--dim); }
 
 /* ---- Custom, empty state ---- */
 .empty-state {
