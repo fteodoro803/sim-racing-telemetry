@@ -275,6 +275,7 @@ function enterEditMode() {
   app.editing = true;
   renderGrid(app.draftLayout, true);
   renderPalette();
+  $('palette').hidden = false;
   renderChrome();
 }
 
@@ -428,15 +429,9 @@ function closeSetup() {
   $('setup').hidden = true;
 }
 
-function togglePalette() {
-  $('palette').hidden = !$('palette').hidden;
-}
-
 function wireControls() {
   for (const tab of document.querySelectorAll('.preset-tab')) tab.addEventListener('click', () => selectPreset(tab.dataset.preset));
   $('editBtn').addEventListener('click', enterEditMode);
-  $('paletteBtn').addEventListener('click', togglePalette);
-  $('emptyAddBtn').addEventListener('click', () => { $('palette').hidden = false; });
   $('resetPresetBtn').addEventListener('click', resetEditLayout);
   $('saveCustomBtn').addEventListener('click', saveDraftAsCustom);
   $('doneBtn').addEventListener('click', doneEditing);
