@@ -839,7 +839,13 @@ td.best { color: var(--best); font-weight: 600; }
   .w-predicted { order: 7; }
   .w-deltaChart, .w-speedChart { order: 8; }
   .w-pedals { order: 9; }
-  .w-tyres { order: 10; }
+  /* Explicit height (BUG-3), same idea as .w-lapTable below. A plain height alone isn't enough here:
+   * .tyre's width is min(45cqh, 35cqw, 260px), and cqh comes from this box's own height, so raising
+   * the height past the min()'s crossover just grows the tyres further and the mismatch never
+   * closes. Pinning .tyre to its floor width keeps the content size fixed so the box height only
+   * has to match that once, instead of chasing a moving target. */
+  .w-tyres { order: 10; height: calc(180px + 20 * var(--u)); }
+  .w-tyres .tyre { width: 60px; }
   .w-lapTable { order: 11; height: calc(200 * var(--u)); }
   /* No room to push the grid aside on a phone, so the palette overlays it here instead. */
   .palette {

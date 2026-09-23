@@ -29,19 +29,19 @@ Resolved entries additionally carry `**Fix:**` (commit/PR) and `**Regression tes
 
 ## Open
 
-### Dashboard
-
-#### BUG-3 — Tyres clips on the phone layout instead of getting a taller row
-**Status:** Open
-**Found:** 2026-09-23, while verifying the Driving widgets' right-sizing against the updated design doc
-**Symptom:** On the phone single-column stack (`@media (max-width: 700px) and (orientation: portrait)` in `web/style.css`), the Tyres widget's content (two rows of tyre graphics, ~154px tall) is cut off by the card's `overflow: hidden` — the card itself only gets ~96px, the same auto-row height as single-row widgets like Speed or Pedals.
-**Repro:** Add Tyres to a layout (e.g. Custom via the palette), view at a phone width (≤700px, portrait). The bottom row of tyres is clipped.
-**Root cause:** `.widget` is `container-type: size`, which makes its box size content-independent by spec; on phone, `.grid`'s `grid-auto-rows: minmax(calc(84 * var(--u)), auto)` can't get an intrinsic content height from a `container-type: size` item to feed the `auto` track sizing, so the row collapses toward the `84 * var(--u)` floor regardless of what the widget actually needs. Every other phone-stacked widget's content happens to fit under that floor already, except Tyres (which needs roughly two rows). `.w-lapTable` already works around the same class of problem with an explicit `height: calc(200 * var(--u))` override; Tyres has no equivalent.
-**Suspected fix:** Give `.w-tyres` an explicit height on the phone breakpoint (mirroring `.w-lapTable`'s pattern), sized to fit two rows of tyres plus padding.
-
 ---
 
 ## Resolved
+
+### BUG-3 — Tyres clips on the phone layout instead of getting a taller row
+**Status:** Resolved
+**Found:** 2026-09-23, while verifying the Driving widgets' right-sizing against the updated design doc
+**Symptom:** On the phone single-column stack (`@media (max-width: 700px) and (orientation: portrait)` in `web/style.css`), the Tyres widget's content (two rows of tyre graphics, ~154px tall) is cut off by the card's `overflow: hidden` — the card itself only gets ~96px, the same auto-row height as single-row widgets like Speed or Pedals.
+**Repro:** Add Tyres to a layout (e.g. Custom via the palette), view at a phone width (≤700px, portrait). The bottom row of tyres is clipped.
+**Root cause:** `.widget` is `container-type: size`, which makes its box size content-independent by spec; on phone, `.grid`'s `grid-auto-rows: minmax(calc(84 * var(--u)), auto)` can't get an intrinsic content height from a `container-type: size` item to feed the `auto` track sizing, so the row collapses toward the `84 * var(--u)` floor regardless of what the widget actually needs. Every other phone-stacked widget's content happens to fit under that floor already, except Tyres (which needs roughly two rows). `.w-lapTable` already works around the same class of problem with an explicit `height: calc(200 * var(--u))` override; Tyres had no equivalent.
+**Investigated and ruled out:** a plain explicit height on `.w-tyres` alone (the originally suspected fix, mirroring `.w-lapTable`). `.tyre`'s width is `min(45cqh, 35cqw, 260px)`, and `cqh` is relative to `.w-tyres`'s own height (it's the `container-type: size` box). Raising that height past the point where `45cqh` overtakes the `60px` floor makes the tyres grow too, which needs still more height — measured in a browser, the content never catches up until the box is pushed out to ~350px, which would tower over every other phone-stacked widget. Below that floor-crossover point, the tyres render at a fixed ~154px content height regardless of the box's height, so no height in that range fits either.
+**Fix:** pin `.tyre`'s width to its floor value (`60px`) inside the phone breakpoint, so the content height stops depending on `cqh` at all, then give `.w-tyres` a matching explicit height (`calc(180px + 20 * var(--u))`) — same pattern as `.w-lapTable`, just with the self-reference broken first.
+**Regression test:** none added — `tests/` covers `web/timing.js`/`demo-source.js`/`format.js` (DOM-free logic per this repo's convention); this was a CSS layout fix with no logic to unit-test. Verified by measuring the rendered widget/content heights in a browser at 320px and 375px phone widths (no overflow) and confirming desktop layout is unaffected.
 
 ### BUG-1 — The bridge kept running silently after its capture failed
 **Status:** Resolved
