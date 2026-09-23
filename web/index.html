@@ -29,9 +29,9 @@
     </div>
     <div class="topbar-right" id="chromeRight">
       <div class="presets" id="presetSwitcher" role="tablist">
-        <button class="preset-tab" type="button" role="tab" data-preset="timing">Timing</button>
-        <button class="preset-tab" type="button" role="tab" data-preset="driving">Driving</button>
-        <button class="preset-tab" type="button" role="tab" data-preset="everything">Everything</button>
+        <button class="preset-tab" type="button" role="tab" data-preset="timing">Timing<span class="edited-dot" id="timingDot" hidden></span></button>
+        <button class="preset-tab" type="button" role="tab" data-preset="driving">Driving<span class="edited-dot" id="drivingDot" hidden></span></button>
+        <button class="preset-tab" type="button" role="tab" data-preset="everything">Everything<span class="edited-dot" id="everythingDot" hidden></span></button>
         <button class="preset-tab" type="button" role="tab" data-preset="custom">Custom<span class="edited-dot" id="customDot" hidden></span></button>
       </div>
       <div class="topbar-right" id="demoControls">
@@ -44,7 +44,7 @@
       <button class="btn" id="editBtn" type="button">Edit</button>
     </div>
     <div class="topbar-right" id="editRight" hidden>
-      <button class="btn" id="resetPresetBtn" type="button">Reset to preset</button>
+      <button class="btn" id="resetPresetBtn" type="button">Reset to default</button>
       <button class="btn" id="saveCustomBtn" type="button">Save as Custom</button>
       <button class="btn primary" id="doneBtn" type="button">Done</button>
     </div>
