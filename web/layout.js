@@ -23,31 +23,89 @@ export const GRID = { cols: 12, rows: 8, baseWidth: 1180, baseHeight: 820, topBa
  */
 export const WIDGET_META = {
   currentLap: { title: 'Current Lap', group: 'timing', minW: 2, minH: 2, addW: 3, addH: 2 },
-  delta: { title: 'Delta', group: 'timing', minW: 2, minH: 2, addW: 3, addH: 2 },
-  sectors: { title: 'Sectors', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 2 },
-  deltaChart: { title: 'Delta Chart', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 2 },
+  delta: {
+    title: 'Delta', group: 'timing', minW: 2, minH: 2, addW: 3, addH: 2,
+    variants: [
+      { id: 'minimal', title: 'Minimal' },
+      { id: 'gauge', title: 'Gauge' },
+    ],
+  },
+  sectors: {
+    title: 'Sectors', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 2,
+    variants: [
+      { id: 'segments', title: 'Segments' },
+      { id: 'list', title: 'List' },
+      { id: 'chips', title: 'Chips' },
+      { id: 'fill', title: 'Progress Fill' },
+    ],
+  },
+  deltaChart: {
+    title: 'Delta Chart', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 2,
+    variants: [
+      { id: 'area', title: 'Area' },
+      { id: 'areaReadout', title: 'Area + Readout' },
+    ],
+  },
   speedChart: { title: 'Speed Chart', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 2 },
-  lastLap: { title: 'Last Lap', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2 },
-  bestLap: { title: 'Best Lap', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2 },
-  predicted: { title: 'Predicted', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2 },
-  lapTable: { title: 'Lap Table', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 3 },
+  lastLap: {
+    title: 'Last Lap', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2,
+    variants: [
+      { id: 'stacked', title: 'Stacked' },
+      { id: 'row', title: 'Row' },
+      { id: 'dual', title: 'Dual Comparison' },
+      { id: 'trend', title: 'Trend Arrow' },
+    ],
+  },
+  bestLap: {
+    title: 'Best Lap', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2,
+    variants: [
+      { id: 'minimal', title: 'Minimal' },
+      { id: 'lapNumber', title: 'With Lap Number' },
+      { id: 'sectorSplit', title: 'With Sectors' },
+      { id: 'wideStrip', title: 'Wide Strip' },
+    ],
+  },
+  predicted: {
+    title: 'Predicted', group: 'timing', minW: 2, minH: 2, addW: 2, addH: 2,
+    variants: [
+      { id: 'stacked', title: 'Stacked' },
+      { id: 'basisNote', title: 'With Basis' },
+      { id: 'range', title: 'Range' },
+      { id: 'compact', title: 'Compact' },
+    ],
+  },
+  lapTable: {
+    title: 'Lap Table', group: 'timing', minW: 3, minH: 2, addW: 6, addH: 3,
+    variants: [
+      { id: 'table', title: 'Table' },
+      { id: 'compactList', title: 'Compact List' },
+      { id: 'rowCards', title: 'Row Cards' },
+      { id: 'spreadsheet', title: 'Spreadsheet' },
+    ],
+  },
   rpmGear: {
-    title: 'RPM + Gear', group: 'driving', minW: 2, minH: 2, addW: 3, addH: 2,
+    title: 'RPM + Gear', group: 'driving', minW: 2, minH: 2, addW: 2, addH: 2,
     variants: [
       { id: 'stacked', title: 'Stacked' },
       { id: 'column', title: 'Column' },
       { id: 'ring', title: 'Ring' },
     ],
   },
-  speed: { title: 'Speed', group: 'driving', minW: 2, minH: 2, addW: 4, addH: 3 },
+  speed: {
+    title: 'Speed', group: 'driving', minW: 2, minH: 1, addW: 2, addH: 1,
+    variants: [
+      { id: 'inline', title: 'Inline' },
+      { id: 'stacked', title: 'Stacked' },
+    ],
+  },
   pedals: {
-    title: 'Pedals', group: 'driving', minW: 2, minH: 1, addW: 2, addH: 3,
+    title: 'Pedals', group: 'driving', minW: 2, minH: 1, addW: 2, addH: 2,
     variants: [
       { id: 'vertical', title: 'Vertical' },
       { id: 'horizontal', title: 'Horizontal' },
     ],
   },
-  tyres: { title: 'Tyres', group: 'driving', minW: 3, minH: 3, addW: 3, addH: 3 },
+  tyres: { title: 'Tyres', group: 'driving', minW: 2, minH: 2, addW: 2, addH: 2 },
 };
 
 /** A widget's variant unless the layout item names one - the first entry in its registry list. */
@@ -62,33 +120,33 @@ export const PRESET_TITLES = { everything: 'Everything', timing: 'Timing', drivi
 export const PRESET_LAYOUTS = {
   everything: [
     { widget: 'currentLap', col: 1, row: 1, w: 3, h: 2 },
-    { widget: 'delta', col: 4, row: 1, w: 3, h: 2 },
-    { widget: 'sectors', col: 1, row: 3, w: 6, h: 2 },
-    { widget: 'deltaChart', col: 1, row: 5, w: 6, h: 2 },
-    { widget: 'lastLap', col: 1, row: 7, w: 2, h: 2 },
-    { widget: 'bestLap', col: 3, row: 7, w: 2, h: 2 },
-    { widget: 'predicted', col: 5, row: 7, w: 2, h: 2 },
+    { widget: 'delta', col: 4, row: 1, w: 3, h: 2, variant: 'minimal' },
+    { widget: 'sectors', col: 1, row: 3, w: 6, h: 2, variant: 'segments' },
+    { widget: 'deltaChart', col: 1, row: 5, w: 6, h: 2, variant: 'area' },
+    { widget: 'lastLap', col: 1, row: 7, w: 2, h: 2, variant: 'stacked' },
+    { widget: 'bestLap', col: 3, row: 7, w: 2, h: 2, variant: 'minimal' },
+    { widget: 'predicted', col: 5, row: 7, w: 2, h: 2, variant: 'stacked' },
     { widget: 'rpmGear', col: 7, row: 1, w: 2, h: 4, variant: 'stacked' },
-    { widget: 'speed', col: 9, row: 1, w: 4, h: 4 },
+    { widget: 'speed', col: 9, row: 1, w: 4, h: 4, variant: 'inline' },
     { widget: 'pedals', col: 7, row: 5, w: 2, h: 4, variant: 'vertical' },
-    { widget: 'lapTable', col: 9, row: 5, w: 4, h: 4 },
+    { widget: 'lapTable', col: 9, row: 5, w: 4, h: 4, variant: 'table' },
   ],
   timing: [
     { widget: 'currentLap', col: 1, row: 1, w: 6, h: 2 },
-    { widget: 'delta', col: 7, row: 1, w: 6, h: 2 },
-    { widget: 'sectors', col: 1, row: 3, w: 12, h: 2 },
+    { widget: 'delta', col: 7, row: 1, w: 6, h: 2, variant: 'minimal' },
+    { widget: 'sectors', col: 1, row: 3, w: 12, h: 2, variant: 'segments' },
     { widget: 'speedChart', col: 1, row: 5, w: 6, h: 2 },
-    { widget: 'deltaChart', col: 7, row: 5, w: 6, h: 2 },
-    { widget: 'lastLap', col: 1, row: 7, w: 2, h: 2 },
-    { widget: 'bestLap', col: 3, row: 7, w: 2, h: 2 },
-    { widget: 'predicted', col: 5, row: 7, w: 2, h: 2 },
-    { widget: 'lapTable', col: 7, row: 7, w: 6, h: 2 },
+    { widget: 'deltaChart', col: 7, row: 5, w: 6, h: 2, variant: 'area' },
+    { widget: 'lastLap', col: 1, row: 7, w: 2, h: 2, variant: 'stacked' },
+    { widget: 'bestLap', col: 3, row: 7, w: 2, h: 2, variant: 'minimal' },
+    { widget: 'predicted', col: 5, row: 7, w: 2, h: 2, variant: 'stacked' },
+    { widget: 'lapTable', col: 7, row: 7, w: 6, h: 2, variant: 'table' },
   ],
   driving: [
     { widget: 'rpmGear', col: 1, row: 1, w: 4, h: 5, variant: 'stacked' },
-    { widget: 'speed', col: 5, row: 1, w: 6, h: 5 },
+    { widget: 'speed', col: 5, row: 1, w: 6, h: 5, variant: 'inline' },
     { widget: 'currentLap', col: 11, row: 1, w: 2, h: 2 },
-    { widget: 'delta', col: 11, row: 3, w: 2, h: 2 },
+    { widget: 'delta', col: 11, row: 3, w: 2, h: 2, variant: 'minimal' },
     { widget: 'pedals', col: 1, row: 6, w: 2, h: 3, variant: 'vertical' },
   ],
 };

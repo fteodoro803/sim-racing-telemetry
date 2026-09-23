@@ -224,7 +224,7 @@ function paletteEntries(group) {
 let expandedPaletteWidget = null;   // id of the palette entry currently showing its variant picker, if any
 
 /** Plausible values for a variant preview - not live data, just enough for the widget to draw something believable. */
-const PREVIEW_FRAME = { gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false, throttle: 70, brake: 0, clutch: 0 };
+const PREVIEW_FRAME = { gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false, throttle: 70, brake: 0, clutch: 0, speed: 226 };
 
 /**
  * A snapshot of the widget itself, at the given variant, for the palette's picker - built and drawn

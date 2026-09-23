@@ -226,6 +226,13 @@ export class LapTracker {
     return best;
   }
 
+  /** The slowest valid lap, or null if there isn't one yet. */
+  get worstLap() {
+    let worst = null;
+    for (const l of this.laps) if (l.valid && (!worst || l.timeMs > worst.timeMs)) worst = l;
+    return worst;
+  }
+
   /** Most recent lap, valid or not: this is what the "last lap" readout shows. */
   get lastLap() {
     return this.laps.length ? this.laps[this.laps.length - 1] : null;

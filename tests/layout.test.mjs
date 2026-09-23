@@ -101,6 +101,7 @@ test('every built-in preset places only registered widgets, none twice, none col
 test('defaultVariant is a widget\'s first registered variant, or undefined if it has none', () => {
   assert.equal(defaultVariant('rpmGear'), 'stacked');
   assert.equal(defaultVariant('pedals'), 'vertical');
-  assert.equal(defaultVariant('speed'), undefined);
+  assert.equal(defaultVariant('speed'), 'inline');
+  assert.equal(defaultVariant('speedChart'), undefined);
   assert.equal(defaultVariant('not-a-widget'), undefined);
 });

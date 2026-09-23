@@ -26,40 +26,69 @@ function niceStep(range, ticks) {
 }
 
 /**
- * Stroke a line whose colour depends on which side of zero it is on (for the delta chart).
+ * Split a signed series into runs of same-coloured points (for the delta chart).
  *
- * Splits the line where it crosses zero so each piece is drawn in its own colour, and batches runs of
- * the same colour into one path, since this is redrawn on every animation frame.
+ * Splits the line where it crosses zero, so a run never mixes the `neg`/`pos` colours, and batches
+ * consecutive points of the same colour into one run.
  */
+function signedRuns(s) {
+  const { neg, pos } = s.signColors;
+  const runs = [];
+  let current = null;
+  const point = (x, y, c) => {
+    if (c !== current?.color) { current = { color: c, points: [] }; runs.push(current); }
+    current.points.push([x, y]);
+  };
+  for (let i = 0; i < s.x.length; i++) {
+    if (i === 0) { point(s.x[0], s.y[0], s.y[0] < 0 ? neg : pos); continue; }
+    const x0 = s.x[i - 1], y0 = s.y[i - 1], x1 = s.x[i], y1 = s.y[i];
+    if (y0 * y1 < 0) {
+      const xm = x0 + (y0 / (y0 - y1)) * (x1 - x0);   // where it crosses zero
+      point(xm, 0, y0 < 0 ? neg : pos);
+      point(xm, 0, y1 < 0 ? neg : pos);
+    }
+    point(x1, y1, y1 < 0 ? neg : pos);
+  }
+  return runs;
+}
+
+/** Stroke a line whose colour depends on which side of zero it is on, one path per same-colour run. */
 function strokeSigned(ctx, s, sx, sy) {
   ctx.lineWidth = s.width || 1.5;
   ctx.lineJoin = 'round';
   ctx.setLineDash([]);
-  let color = null;
-  const flush = () => { if (color) { ctx.strokeStyle = color; ctx.stroke(); } };
-  const segment = (x0, y0, x1, y1, c) => {
-    if (c !== color) { flush(); color = c; ctx.beginPath(); ctx.moveTo(sx(x0), sy(y0)); }
-    ctx.lineTo(sx(x1), sy(y1));
-  };
-  const { neg, pos } = s.signColors;
-  for (let i = 1; i < s.x.length; i++) {
-    const x0 = s.x[i - 1], y0 = s.y[i - 1], x1 = s.x[i], y1 = s.y[i];
-    if (y0 * y1 < 0) {
-      const xm = x0 + (y0 / (y0 - y1)) * (x1 - x0);   // where it crosses zero
-      segment(x0, y0, xm, 0, y0 < 0 ? neg : pos);
-      segment(xm, 0, x1, y1, y1 < 0 ? neg : pos);
-    } else {
-      segment(x0, y0, x1, y1, y0 + y1 < 0 ? neg : pos);
-    }
+  for (const run of signedRuns(s)) {
+    ctx.strokeStyle = run.color;
+    ctx.beginPath();
+    run.points.forEach(([x, y], i) => {
+      if (i === 0) ctx.moveTo(sx(x), sy(y)); else ctx.lineTo(sx(x), sy(y));
+    });
+    ctx.stroke();
   }
-  flush();
+}
+
+/** Fill the area between a signed line and zero, one polygon per same-colour run, at low opacity. */
+function fillSigned(ctx, s, sx, sy, opacity = 0.18) {
+  ctx.globalAlpha = opacity;
+  for (const run of signedRuns(s)) {
+    if (run.points.length < 2) continue;
+    ctx.fillStyle = run.color;
+    ctx.beginPath();
+    ctx.moveTo(sx(run.points[0][0]), sy(0));
+    for (const [x, y] of run.points) ctx.lineTo(sx(x), sy(y));
+    ctx.lineTo(sx(run.points[run.points.length - 1][0]), sy(0));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 /**
  * Draw a line chart onto a canvas: grid, axis labels, split markers, the data series and a position dot.
  *
- * series: [{ x: number[], y: number[], color, width?, dash?, signColors?: {neg, pos} }], drawn in order.
- *         With `signColors`, the line is drawn in `neg` below zero and `pos` above it instead of `color`.
+ * series: [{ x: number[], y: number[], color, width?, dash?, signColors?: {neg, pos}, fill? }], drawn
+ *         in order. With `signColors`, the line is drawn in `neg` below zero and `pos` above it
+ *         instead of `color`; `fill` (signed series only) also shades the area down to zero.
  * opts:   { xMax, yMin, yMax, yFormat?, xFormat?, vlines?: number[], zero?: bool, marker?: {x, y, color}, theme }
  *
  * Redraws from scratch every call, sized to the canvas's CSS size and the screen's pixel density.
@@ -131,7 +160,11 @@ export function drawChart(canvas, series, opts) {
   ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
   for (const s of series) {
     if (!s.x.length) continue;
-    if (s.signColors) { strokeSigned(ctx, s, sx, sy); continue; }
+    if (s.signColors) {
+      if (s.fill) fillSigned(ctx, s, sx, sy);
+      strokeSigned(ctx, s, sx, sy);
+      continue;
+    }
     ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.5; ctx.lineJoin = 'round';
     ctx.setLineDash(s.dash || []);
     ctx.beginPath();

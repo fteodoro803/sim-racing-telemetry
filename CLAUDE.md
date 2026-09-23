@@ -40,6 +40,8 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 
 **Dashboard elements are widgets.** A new panel is a definition in `web/widgets.js` (`build` once, `update` from the shared context, optional `onTap`) placed by `web/layout.js`; widgets read only the context they are given, never the data source or each other. Size everything in the `--u` unit so it scales with the screen. See `DASHBOARD_PLAN.md`.
 
+**Widget designs must be right-sized.** A widget's (or variant's) `WIDGET_META` size (`minW`/`minH`/`addW`/`addH`) must match the grid-cell dimensions the design mockup actually draws it at — not a rounder or more generous guess. And within that box, content should fill it (per the mockup's own padding), not sit inside extra margin the mockup doesn't have. When building or revising a widget against `design/Widget Responsive Behavior.dc.html`, check both before calling it done: the registry size against the mockup's own `N×M` tag, and the rendered fill (measured in a browser, not just read off the CSS) against the mockup's padding. [D30](DECISIONS.md).
+
 **Sector times are derived, never stored per lap** (O6): compute them from a lap's samples and the current split fractions, so changing splits recomputes everything.
 
 **Session persistence and export.** `web/persistence.js` (IndexedDB) and `web/session-file.js` (JSON export/import) build on `LapTracker#restoreSession` and its `onEvent` callback; keep both DOM-free of the tracker itself (they take a tracker instance, they don't reach into `app.js`'s state). See D20/O15 in `DECISIONS.md`.
