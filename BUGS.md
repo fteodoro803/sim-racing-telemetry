@@ -29,9 +29,15 @@ Resolved entries additionally carry `**Fix:**` (commit/PR) and `**Regression tes
 
 ## Open
 
-*None yet.*
+### Dashboard
 
-<!-- Group entries under domain headings (e.g. Timing, Bridge, UI). Entry headings use #### under a ### domain. -->
+#### BUG-3 — Tyres clips on the phone layout instead of getting a taller row
+**Status:** Open
+**Found:** 2026-09-23, while verifying the Driving widgets' right-sizing against the updated design doc
+**Symptom:** On the phone single-column stack (`@media (max-width: 700px) and (orientation: portrait)` in `web/style.css`), the Tyres widget's content (two rows of tyre graphics, ~154px tall) is cut off by the card's `overflow: hidden` — the card itself only gets ~96px, the same auto-row height as single-row widgets like Speed or Pedals.
+**Repro:** Add Tyres to a layout (e.g. Custom via the palette), view at a phone width (≤700px, portrait). The bottom row of tyres is clipped.
+**Root cause:** `.widget` is `container-type: size`, which makes its box size content-independent by spec; on phone, `.grid`'s `grid-auto-rows: minmax(calc(84 * var(--u)), auto)` can't get an intrinsic content height from a `container-type: size` item to feed the `auto` track sizing, so the row collapses toward the `84 * var(--u)` floor regardless of what the widget actually needs. Every other phone-stacked widget's content happens to fit under that floor already, except Tyres (which needs roughly two rows). `.w-lapTable` already works around the same class of problem with an explicit `height: calc(200 * var(--u))` override; Tyres has no equivalent.
+**Suspected fix:** Give `.w-tyres` an explicit height on the phone breakpoint (mirroring `.w-lapTable`'s pattern), sized to fit two rows of tyres plus padding.
 
 ---
 

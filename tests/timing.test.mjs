@@ -224,6 +224,13 @@ test('an interrupted lap never becomes the best lap, even when it is the fastest
   assert.ok(tr.theoreticalBest() <= tr.bestLap.timeMs);
 });
 
+test('worstLap is the slowest valid lap, skipping an interrupted one', () => {
+  const tr = run(injectGap(cleanFrames(), 6, { paused: true }));
+  const expected = tr.validLaps.reduce((w, l) => (!w || l.timeMs > w.timeMs ? l : w), null);
+  assert.equal(tr.worstLap, expected);
+  assert.ok(tr.worstLap.valid);
+});
+
 test('comparing to "last lap" skips an interrupted lap', () => {
   const tr = run(injectGap(cleanFrames(), 4, { paused: true })
     .filter((f) => f.lap <= 5), new LapTracker({ compareMode: 'last' }));
