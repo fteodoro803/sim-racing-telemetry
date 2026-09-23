@@ -106,10 +106,20 @@ button, select, input { font: inherit; color: inherit; }
 .btn:disabled { opacity: .4; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #0d1117; font-weight: 600; }
 
+/* ---- workspace: grid + palette side by side, so opening the palette resizes the grid ---- */
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+}
+
 /* ---- grid and widget cards ---- */
 .grid {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   margin: calc(16 * var(--u));
   display: grid;
@@ -730,22 +740,16 @@ td.best { color: var(--best); font-weight: 600; }
 }
 .ghost.invalid { border-color: var(--bad); background: rgba(255, 107, 107, .08); }
 
-/* ---- palette drawer ---- */
+/* ---- palette drawer: a flex sibling of the grid, so it resizes the grid instead of covering it ---- */
 .palette {
-  position: absolute;
-  top: calc(48 * var(--u));
-  right: 0;
-  bottom: 0;
-  width: min(calc(300 * var(--u)), 80vw);
+  flex: 0 0 min(calc(300 * var(--u)), 80vw);
   padding: calc(16 * var(--u));
   background: var(--panel);
   border-left: 1px solid var(--line);
-  box-shadow: calc(-12 * var(--u)) 0 calc(30 * var(--u)) rgba(0, 0, 0, .4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: calc(10 * var(--u));
-  z-index: 15;
 }
 .palette-title { font-size: calc(13 * var(--u)); font-weight: 700; }
 .palette-group-title { font-size: calc(10 * var(--u)); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: calc(4 * var(--u)); }
@@ -766,9 +770,37 @@ td.best { color: var(--best); font-weight: 600; }
 }
 .palette-item:disabled, .palette-item.added { opacity: .4; cursor: default; }
 .palette-item.later { opacity: .45; cursor: default; }
+.palette-item.expanded { background: rgba(255, 255, 255, .07); cursor: pointer; }
 .palette-swatch { width: calc(36 * var(--u)); height: calc(26 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--bg); border: 1px solid var(--line); flex: 0 0 auto; }
 .palette-name { flex: 1; font-size: calc(13 * var(--u)); }
 .palette-size { font-size: calc(11 * var(--u)); color: var(--dim); font-family: var(--mono); }
+.palette-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8 * var(--u));
+  padding: 0 calc(8 * var(--u)) calc(8 * var(--u));
+  margin-top: calc(-2 * var(--u));
+}
+.palette-variant-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(5 * var(--u));
+  width: calc(120 * var(--u));
+  font-size: calc(11 * var(--u));
+  color: var(--text);
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line);
+  border-radius: calc(6 * var(--u));
+  padding: calc(6 * var(--u));
+  cursor: pointer;
+  font: inherit;
+}
+.palette-variant-btn:hover { background: rgba(255, 255, 255, .1); }
+.palette-variant-label { line-height: 1.2; }
+
+/* The variant preview reuses the real `.widget` styling (buildVariantPreview) at a smaller fixed size. */
+.vi-preview { width: 100%; height: calc(96 * var(--u)); flex: none; pointer-events: none; }
 .soon { font-size: calc(9 * var(--u)); color: var(--dim); border: 1px solid var(--line); border-radius: 99px; padding: calc(2 * var(--u)) calc(7 * var(--u)); }
 
 /* ---- Custom, empty state ---- */
@@ -809,7 +841,15 @@ td.best { color: var(--best); font-weight: 600; }
   .w-pedals { order: 9; }
   .w-tyres { order: 10; }
   .w-lapTable { order: 11; height: calc(200 * var(--u)); }
-  .palette { top: 0; width: 100%; }
+  /* No room to push the grid aside on a phone, so the palette overlays it here instead. */
+  .palette {
+    position: absolute;
+    inset: 0;
+    flex-basis: auto;
+    width: 100%;
+    box-shadow: calc(-12 * var(--u)) 0 calc(30 * var(--u)) rgba(0, 0, 0, .4);
+    z-index: 15;
+  }
   .presets, #editBtn, #demoControls .speed { display: none; }
 }
 

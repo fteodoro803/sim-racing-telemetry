@@ -221,10 +221,34 @@ function paletteEntries(group) {
   return Object.entries(WIDGET_META).filter(([, meta]) => meta.group === group);
 }
 
+let expandedPaletteWidget = null;   // id of the palette entry currently showing its variant picker, if any
+
+/** Plausible values for a variant preview - not live data, just enough for the widget to draw something believable. */
+const PREVIEW_FRAME = { gear: 4, suggestedGear: 0, rpm: 5200, rpmWarning: 6200, rpmLimiter: 7000, revLimitAlert: false, throttle: 70, brake: 0, clutch: 0, speed: 226 };
+
+/**
+ * A snapshot of the widget itself, at the given variant, for the palette's picker - built and drawn
+ * with the widget's own `build`/`update` (same as `renderGrid`) so what you pick is exactly what you
+ * get, not a hand-drawn stand-in. `.widget` is already a CSS size container (D25's fluid clamps), so
+ * it draws correctly at this smaller fixed size; only `frame` is faked, from `PREVIEW_FRAME`.
+ */
+function buildVariantPreview(widgetId, variantId) {
+  const def = WIDGETS[widgetId];
+  const card = el('div', 'widget vi-preview');
+  card.dataset.variant = variantId;
+  if (!def.noLabel) card.append(el('div', 'w-label', def.title));
+  const body = el('div', 'w-body');
+  card.append(body);
+  const refs = def.build(body);
+  def.update(refs, { frame: PREVIEW_FRAME, theme: app.theme, mode: 'demo' });
+  return card;
+}
+
 function buildPaletteList(containerId, group) {
   const list = $(containerId);
   list.replaceChildren();
   for (const [id, meta] of paletteEntries(group)) {
+    const hasVariants = meta.variants && meta.variants.length > 1;
     const item = el('button', 'palette-item');
     item.type = 'button';
     const swatch = el('span', 'palette-swatch');
@@ -234,8 +258,33 @@ function buildPaletteList(containerId, group) {
     const already = app.draftLayout.some((it) => it.widget === id);
     item.disabled = already;
     item.classList.toggle('added', already);
-    item.addEventListener('click', () => editor.addWidget(id));
+    const expanded = hasVariants && expandedPaletteWidget === id;
+    item.classList.toggle('expanded', expanded);
+    if (hasVariants) {
+      // Pick the shape before it lands on the grid (D27's picker, moved ahead of placement): a first
+      // click opens the variant row below instead of adding the widget outright.
+      item.addEventListener('click', () => {
+        expandedPaletteWidget = expanded ? null : id;
+        renderPalette();
+      });
+    } else {
+      item.addEventListener('click', () => editor.addWidget(id));
+    }
     list.append(item);
+    if (expanded) {
+      const variants = el('div', 'palette-variants');
+      for (const v of meta.variants) {
+        const button = el('button', 'palette-variant-btn');
+        button.type = 'button';
+        button.append(buildVariantPreview(id, v.id), el('span', 'palette-variant-label', v.title));
+        button.addEventListener('click', () => {
+          expandedPaletteWidget = null;
+          editor.addWidget(id, v.id);
+        });
+        variants.append(button);
+      }
+      list.append(variants);
+    }
   }
 }
 
@@ -273,8 +322,10 @@ function selectPreset(presetId) {
 function enterEditMode() {
   app.draftLayout = cloneOfPreset(app.dashboard.presetId);
   app.editing = true;
+  expandedPaletteWidget = null;
   renderGrid(app.draftLayout, true);
   renderPalette();
+  $('palette').hidden = false;
   renderChrome();
 }
 
@@ -428,15 +479,9 @@ function closeSetup() {
   $('setup').hidden = true;
 }
 
-function togglePalette() {
-  $('palette').hidden = !$('palette').hidden;
-}
-
 function wireControls() {
   for (const tab of document.querySelectorAll('.preset-tab')) tab.addEventListener('click', () => selectPreset(tab.dataset.preset));
   $('editBtn').addEventListener('click', enterEditMode);
-  $('paletteBtn').addEventListener('click', togglePalette);
-  $('emptyAddBtn').addEventListener('click', () => { $('palette').hidden = false; });
   $('resetPresetBtn').addEventListener('click', resetEditLayout);
   $('saveCustomBtn').addEventListener('click', saveDraftAsCustom);
   $('doneBtn').addEventListener('click', doneEditing);
