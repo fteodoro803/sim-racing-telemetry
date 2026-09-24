@@ -46,6 +46,8 @@ python3 bridge/bridge.py --ps4-ip YOUR-PS4-IP --port 8766 --heartbeat-port 33741
 `capture.py` takes the same `--heartbeat-port` and `--telemetry-port` flags.
 
 To record the raw packets while it runs (useful as test data), add `--record captures/session.jsonl.gz`.
+
+If the dashboard stutters, add `--log-gaps`: it prints `[gap]` when packets from the console arrive late (a network or console problem) and `[slow send]` when the bridge is slow handing them to the browser. If the gaps are on the console side, use the smoothing slider in the page's Live tab.
 `captures/` is ignored by git; a capture worth keeping as a test fixture should be copied to
 `bridge/tests/fixtures/` on purpose.
 

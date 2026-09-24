@@ -12,6 +12,7 @@ import {
 import { el, setClass, setText } from './dom.js';
 import { buildEditChrome, wireEditMode } from './edit.js';
 import { WIDGET_META } from './layout.js';
+import { JitterBuffer } from './jitter-buffer.js';
 import { LiveSource } from './live-source.js';
 import { clearSession, loadSession, saveSession } from './persistence.js';
 import { buildExport, downloadJson, exportFilename, readImport } from './session-file.js';
@@ -23,6 +24,8 @@ const $ = (id) => document.getElementById(id);
 const DEMO_HISTORY_LAPS = 3;                       // open the demo with laps 1-2 already driven
 const DEFAULT_ADDRESS = 'ws://localhost:8765/ws';  // where the bridge listens when run on this computer
 const ADDRESS_KEY = 'telemetry.bridgeAddress';
+const JITTER_KEY = 'telemetry.jitterDelayMs';
+const JITTER_MAX_MS = 300;
 
 /** localStorage that never throws: it can be unavailable (private windows, blocked site data). */
 const storage = {
@@ -43,6 +46,13 @@ function onTrackerEvent(type, payload) {
 }
 
 const tracker = new LapTracker({ onEvent: onTrackerEvent });
+
+/** The saved smoothing delay, clamped to the slider's range; 0 (off) if nothing sensible is saved. */
+function savedJitterDelay() {
+  const value = Number(storage.get(JITTER_KEY));
+  return Number.isFinite(value) ? Math.max(0, Math.min(JITTER_MAX_MS, value)) : 0;
+}
+
 const app = {
   mode: 'demo',              // 'demo' or 'live'
   servedByBridge: false,     // true when this page came from the bridge, so it can connect to itself
@@ -69,6 +79,9 @@ function ingest(frame) {
   tracker.ingest(frame);
 }
 
+/** Live frames wait here so a burst after a network stall is replayed evenly (D33); `tick` releases them. */
+const jitter = new JitterBuffer({ emit: ingest, delayMs: savedJitterDelay() });
+
 function resetSession() {
   tracker.reset();
   app.frame = null;
@@ -86,6 +99,7 @@ async function loadDemoData() {
 
 function stopLive() {
   app.live?.close();
+  jitter.reset();
   app.live = null;
   app.connection = 'idle';
 }
@@ -126,7 +140,7 @@ async function startLive(url) {
   else tracker.reset();
   app.frame = null;
   app.connection = 'connecting';
-  app.live = new LiveSource(url, { onFrame: ingest, onState: (state) => { app.connection = state; } });
+  app.live = new LiveSource(url, { onFrame: (frame) => jitter.push(frame), onState: (state) => { app.connection = state; } });
   app.live.connect();
 }
 
@@ -578,6 +592,7 @@ function render() {
   const ctx = context();
   for (const { def, refs } of app.widgets) def.update(refs, ctx);
   renderChrome();
+  if (!$('setup').hidden) renderJitter();
 }
 
 // ---- setup panel -----------------------------------------------------------
@@ -608,6 +623,15 @@ function checkAddress() {
   return ok;
 }
 
+/** Show the smoothing delay, and how many frames in the last few seconds still arrived too late for it. */
+function renderJitter() {
+  const ms = jitter.delayMs;
+  setText($('jitterValue'), ms === 0 ? 'off' : `${ms} ms`);
+  const late = jitter.lateRecently;
+  const stalls = late === 0 ? 'No late frames in the last 10 s.' : `${late} late frame${late === 1 ? '' : 's'} in the last 10 s${ms === 0 ? ' (that is the stutter smoothing would hide).' : ': raise the delay to hide them.'}`;
+  setText($('jitterHint'), `Holds live frames back briefly so bursts after a network stall look smooth. Lower it until the stutter returns. ${stalls}`);
+}
+
 function openSetup() {
   const remembered = storage.get(ADDRESS_KEY);
   const own = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
@@ -634,6 +658,11 @@ function wireControls() {
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSetup(); });
   for (const button of document.querySelectorAll('.tab')) button.addEventListener('click', () => setupTab(button.dataset.tab));
   $('address').addEventListener('input', checkAddress);
+  $('jitterDelay').value = String(jitter.delayMs);
+  $('jitterDelay').addEventListener('input', () => {
+    jitter.setDelay(Number($('jitterDelay').value));
+    storage.set(JITTER_KEY, String(jitter.delayMs));
+  });
   $('useDemo').addEventListener('click', () => { closeSetup(); startDemo(); });
   $('connectBtn').addEventListener('click', () => {
     if (!checkAddress()) return;
@@ -672,6 +701,7 @@ function tick(now) {
   if (app.mode === 'demo' && app.demo && !app.paused && !app.demo.done) {
     app.demo.advance(dt, 1, ingest);
   }
+  jitter.poll();
   render();
   requestAnimationFrame(tick);
 }

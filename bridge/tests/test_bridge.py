@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bridge import Bridge, main
+from bridge import Bridge, GapLog, main
 from capture import capture
 from fake_console import FakeConsole, build_packet
 from frames import to_frame
@@ -241,10 +241,34 @@ class ServerTest(unittest.TestCase):
             time.sleep(0.02)
         self.assertEqual(self.hub.client_count, 0)
 
+    def test_client_sockets_disable_nagle_so_frames_are_not_batched(self):
+        sock, _, _ = handshake(self.port)
+        read_frame(sock)
+        deadline = time.time() + 2
+        while self.hub.client_count == 0 and time.time() < deadline:
+            time.sleep(0.01)
+        client = next(iter(self.hub._clients))
+        self.assertTrue(client.sock.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY))
+        sock.close()
+
     def test_websocket_upgrade_without_a_key_is_rejected(self):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
         conn.request("GET", "/ws", headers={"Upgrade": "websocket", "Connection": "Upgrade"})
         self.assertEqual(conn.getresponse().status, 400)
+
+
+class GapLogTest(unittest.TestCase):
+    def test_reports_only_long_gaps_and_slow_sends(self):
+        lines = []
+        log = GapLog(lines.append)
+        log.arrived(1.000)
+        log.arrived(1.016)          # a normal 60 Hz gap
+        log.arrived(1.130)          # 114 ms stall
+        log.sent(2.000, 2.005)      # fast
+        log.sent(2.000, 2.050)      # 50 ms
+        self.assertEqual(len(lines), 2)
+        self.assertIn("114 ms", lines[0])
+        self.assertIn("slow send", lines[1])
 
 
 class BridgeFailureTest(unittest.TestCase):
