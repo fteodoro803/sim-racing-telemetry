@@ -653,6 +653,7 @@ td.best { color: var(--best); font-weight: 600; }
   border: 1px solid var(--line-strong);
   border-radius: calc(6 * var(--u));
 }
+.field input[type="range"] { padding: 0; border: 0; background: none; accent-color: var(--accent); }
 .steps { margin: calc(12 * var(--u)) 0; padding-left: calc(20 * var(--u)); color: var(--muted); line-height: 1.7; }
 .modal-actions { display: flex; align-items: center; justify-content: space-between; gap: calc(12 * var(--u)); }
 .link { color: var(--accent); text-decoration: none; }

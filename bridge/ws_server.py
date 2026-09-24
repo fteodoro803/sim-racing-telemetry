@@ -186,6 +186,9 @@ def make_handler(web_dir, hub, info, hello):
             # 2. Register the client and greet it
             sock = self.connection
             sock.settimeout(SEND_TIMEOUT_S)
+            # Send each frame the moment it's written; Nagle's algorithm would otherwise hold small
+            # writes back to batch them, showing up in the browser as ~100 ms stalls then a burst.
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             client = WsClient(sock)
             hub.add(client)
             try:

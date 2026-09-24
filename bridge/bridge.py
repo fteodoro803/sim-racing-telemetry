@@ -31,17 +31,43 @@ DEFAULT_PORT = 8765
 STATUS_EVERY_S = 1.0
 
 
+class GapLog:
+    """Reports stalls between packets arriving and how long each broadcast takes, to find where a stutter starts.
+
+    A long gap between packets means the delay is upstream of the bridge (network or console); a long
+    broadcast means the bridge or the browser connection is the slow part.
+    """
+
+    def __init__(self, say, gap_ms=50, send_ms=20):
+        self.say = say
+        self.gap_ms = gap_ms
+        self.send_ms = send_ms
+        self._last = None
+
+    def arrived(self, now):
+        """Note a packet arriving at `now` (a time.monotonic() value); report it if the gap was long."""
+        if self._last is not None and (now - self._last) * 1000 >= self.gap_ms:
+            self.say(f"[gap] no packet for {(now - self._last) * 1000:.0f} ms before this one")
+        self._last = now
+
+    def sent(self, started, finished):
+        """Report a broadcast that took long to hand to the browsers."""
+        if (finished - started) * 1000 >= self.send_ms:
+            self.say(f"[slow send] broadcast took {(finished - started) * 1000:.0f} ms")
+
+
 class Bridge:
     """The running bridge: the console capture, the HTTP/WebSocket server, and the broadcast between them."""
 
     def __init__(self, console_ip, *, packet_type="A", heartbeat_port=HEARTBEAT_PORT,
                  telemetry_port=TELEMETRY_PORT, host="0.0.0.0", http_port=DEFAULT_PORT,
-                 web_dir=DEFAULT_WEB_DIR, record=None, say=print):
+                 web_dir=DEFAULT_WEB_DIR, record=None, say=print, log_gaps=False):
         self.console_ip = console_ip
         self.packet_type = packet_type
         self.heartbeat_port = heartbeat_port
         self.telemetry_port = telemetry_port
         self.record = record
+        self.gap_log = GapLog(say) if log_gaps else None
         self.say = say
         self.hub = Hub()
         info = {"bridge": True, "game": "gt7", "packetType": packet_type}
@@ -56,8 +82,13 @@ class Bridge:
 
     def _on_decoded(self, decoded, seconds):
         """Convert a decoded packet to a frame and broadcast it to every connected browser."""
+        started = time.monotonic()
+        if self.gap_log:
+            self.gap_log.arrived(started)
         frame = make_frame(decoded, self.clock, seconds * 1000)
         self.hub.broadcast_frame(json.dumps({"type": "frame", **frame}, separators=(",", ":")))
+        if self.gap_log:
+            self.gap_log.sent(started, time.monotonic())
 
     def _status_loop(self):
         """Once a second, tell the browsers whether packets are still arriving from the console."""
@@ -120,6 +151,8 @@ def main(argv=None):
                         help=f"local port to receive telemetry on (default {TELEMETRY_PORT})")
     parser.add_argument("--web-dir", type=Path, default=DEFAULT_WEB_DIR, help="folder to serve")
     parser.add_argument("--record", help="also record raw packets to this file (.gz to compress)")
+    parser.add_argument("--log-gaps", action="store_true",
+                        help="print stalls between packets and slow broadcasts, to diagnose stuttering")
     args = parser.parse_args(argv)
     if not args.ip and not args.fake_console:
         parser.error("give --ps4-ip, or --fake-console to try it without a console")
@@ -139,7 +172,7 @@ def main(argv=None):
 
     bridge = Bridge(ip, packet_type=args.packet_type, host=args.host, http_port=args.port,
                     heartbeat_port=args.heartbeat_port, telemetry_port=args.telemetry_port,
-                    web_dir=args.web_dir, record=args.record)
+                    web_dir=args.web_dir, record=args.record, log_gaps=args.log_gaps)
     bridge.start()
     print(f"Asking {ip} for type-{args.packet_type} packets.", flush=True)
     print(f"Open on this computer:  http://localhost:{bridge.port}", flush=True)
