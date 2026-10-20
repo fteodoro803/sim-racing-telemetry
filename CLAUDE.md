@@ -10,6 +10,11 @@ Working conventions for keeping this repo's documentation current. Read alongsid
 - `TRACK_MAP_PLAN.md` — will hold the design for the track map, split editor and track identification, plus an Implementation Log of what's actually been built. Create it when that pass starts.
 - [`AUDIT_PLAN.md`](AUDIT_PLAN.md) — a checklist for a dedicated higher-effort audit pass, not yet run. Findings from it go into `BUGS.md`/`DECISIONS.md`/`PROJECT_CONTEXT.md` as usual, not back into this file.
 
+**Reading pages** (steps in the project-docs skill; links in `PROJECT_CONTEXT.md`):
+- Before building anything that touches several pieces, publish a **plan page** and wait for the go-ahead. Small fixes stay a short proposal in chat.
+- At the end of a feature, milestone, refactor or plan pass, offer a **recap page**.
+- `LEARNINGS.md` (learning mode) is published on the **docs page**; after a task that changed it, republish the page.
+
 There is deliberately no design-system doc or architecture-map doc (see D10 in `DECISIONS.md`); the README covers layout and the frame format.
 
 **Where things go** (three different questions, three different files):
