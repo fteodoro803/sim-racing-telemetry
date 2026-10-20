@@ -86,3 +86,16 @@ If a messy first lap makes the reference line poor ([O5](DECISIONS.md)), re-proj
 - Treat this as background, not a task list. When asked to explore, map, or document the repo, use this file to understand intent — don't treat it as a prompt to start fixing things.
 - When an item above gets resolved, update this file so it stays accurate (strike it through and annotate; don't delete or renumber).
 - Companion docs: [`DECISIONS.md`](DECISIONS.md) (open questions + decision log), [`CLAUDE.md`](CLAUDE.md) (conventions and standing rules), [`BUGS.md`](BUGS.md) (confirmed/suspected bugs, separate from the incomplete-feature list above), [`FEATURE_MAP.md`](FEATURE_MAP.md) (features and their status), [`GT7_TELEMETRY.md`](GT7_TELEMETRY.md) (what the GT7 packet provides), [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) (the dashboard design and build plan). A `TRACK_MAP_PLAN.md` will be added when the track-map pass starts.
+- `LEARNINGS.md` (learning-mode notes) is a companion doc too.
+- Docs page: not published yet (ask before the first publish)
+- Plan page: not published yet
+- Recap page: not published yet
+
+## Learning mode
+
+Pieces to slow down for (levels from `~/.claude/learning/familiarity.md`); everything else runs at normal speed.
+
+- **Vanilla JS ES modules + canvas** (learning, builds on React 19): `web/charts.js`, `web/widgets.js`
+- **UDP sockets + WebSockets** (new, builds on Meteor): `bridge/capture.py`, `bridge/ws_server.py`, `web/live-source.js`
+- **IndexedDB** (new, builds on MongoDB): `web/persistence.js`
+
