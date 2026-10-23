@@ -35,7 +35,7 @@ How code is written in this project. A decision in `DECISIONS.md` that creates a
 
 **Comments:** use the `outline-style-comments` skill whenever writing or reviewing code comments or docstrings, including existing code (D9). In short: explain why, not what; the first line is a self-contained summary so folded code still reads clearly, with detail beneath it; number ordered steps; give distinct JSX/markup blocks banner comments.
 
-**Published folder:** only `web/` is published to the portfolio (D3). Keep it static and standalone: relative paths only (`app.js`, never `/app.js`), no dependency on the portfolio's CSS or JS, no build step, no runtime dependencies, and a `<a href="../">Back to Lab</a>` link. Keep everything else (bridge, tools, tests, docs) outside it.
+**Published folder:** only `web/` is published to the portfolio (D3). Keep it static and standalone: relative paths only (`app.js`, never `/app.js`), no dependency on the portfolio's CSS or JS, no build step, no runtime dependencies, and a `<a href="../">Back to Projects</a>` link. Keep everything else (bridge, tools, tests, docs) outside it.
 
 **Frame format is the contract.** Every source (demo, and each game's bridge decoder) produces the normalised frame described in the README, and `web/timing.js` only ever sees that. Game-specific knowledge belongs in a decoder, never in the timing or UI code.
 
